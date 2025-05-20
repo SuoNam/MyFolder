@@ -1,7 +1,7 @@
 package xyz.suonan.myfolder_sever.BaseMessage;
 
-public class FileBaseMessage<T> {
-    public FileBaseMessage(int status,String message, T data) {
+public class BaseMessage<T> {
+    public BaseMessage(int status, String message, T data) {
         this.status = status;
         this.message = message;
         this.data = data;
