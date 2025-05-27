@@ -49,7 +49,7 @@ public class FileHttpController {
     }
     @GetMapping("/downloadfile")
     public ResponseEntity<Resource> downLoadFile(@RequestParam String filePathS) throws IOException {
-        Path filePath= Paths.get(filePathS);
+        Path filePath= Paths.get(basePath,filePathS);
         Resource resource = new UrlResource(filePath.toUri());
 
         return ResponseEntity.ok()
@@ -59,7 +59,8 @@ public class FileHttpController {
     }
     @PostMapping("/uploadfile")
     public BaseMessage<FileBaseItem> upLoadFile(@RequestParam("file") MultipartFile file, @RequestParam("path") String path) throws IOException {
-        File dest = new File(path);
+        Path start = Paths.get(basePath,path);
+        File dest = new File(start.toFile().getAbsolutePath());
         try {
             file.transferTo(dest); // 保存文件
             return new BaseMessage<>(200,"上传成功",null);
