@@ -1,4 +1,6 @@
 package xyz.suonan.myfolder_sever.Controller;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
@@ -23,6 +25,11 @@ import java.util.stream.Stream;
 @RestController
 public class FileHttpController {
 
+    @Value("${basePath}")
+    private String basePath;
+    @Autowired
+    private WrapFileBaseItem wrapFileBaseItem;
+
     //获取文件夹内的内容
     /* 文件格式：{type:file,fileName:...,size:...,createDate:...}
     *  文件夹格式:{type:directory,directoryName:...,[文件||文件夹]}
@@ -31,9 +38,9 @@ public class FileHttpController {
     @PostMapping("/getfilelist")
     public BaseMessage<List<FileBaseItem>> getFileList(@RequestBody Map<String, String> directoryPathMap) throws IOException {
         String directoryPath=directoryPathMap.get("directoryPath");
-        Path start = Paths.get(directoryPath);
-        try (Stream<Path> stream = Files.walk(start, 1)) {
-            List<FileBaseItem> fileBaseItemList=stream.map(WrapFileBaseItem::wrapFileBaseItem).toList();
+        Path start = Paths.get(basePath,directoryPath);
+        try (Stream<Path> stream = Files.walk(start, 1).filter(path -> !path.equals(start))) {
+            List<FileBaseItem> fileBaseItemList=stream.map(wrapFileBaseItem::wrapFileBaseItem).toList();
             return new BaseMessage<>(200,"获取成功",fileBaseItemList);
         } catch (IOException e) {
             //TODO::日志打印错误信息
