@@ -27,7 +27,7 @@ public class WrapFileBaseItem {
             return null;
         }
         else if(file.isDirectory()){
-            return new Directory(file.getName(),"Directory",this.basePath.relativize(ItemPath));
+            return new Directory(file.getName(),"Directory",this.basePath.relativize(ItemPath),new Date(file.lastModified()));
         }
         else if(file.isFile()){
             return new MyFile("File",file.getName(),file.length(),new Date(file.lastModified()),this.basePath.relativize(ItemPath));
