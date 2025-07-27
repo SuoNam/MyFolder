@@ -1,4 +1,5 @@
 package xyz.suonan.myfolder_sever.Controller;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -14,15 +15,12 @@ import xyz.suonan.myfolder_sever.MyObject.FileBaseItem;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-
+@Slf4j
 @RequestMapping("/file")
 @RestController
 public class FileHttpController {
@@ -45,7 +43,8 @@ public class FileHttpController {
             List<FileBaseItem> fileBaseItemList=stream.map(wrapFileBaseItem::wrapFileBaseItem).toList();
             return new BaseMessage<>(200,"获取成功",fileBaseItemList);
         } catch (IOException e) {
-            //TODO::日志打印错误信息
+            //日志打印错误信息
+            log.error(e.getMessage());
             return new BaseMessage<>(500,"获取失败",null);
         }
     }
@@ -61,17 +60,23 @@ public class FileHttpController {
                 .body(resource);
     }
     @PostMapping("/uploadfile")
-    public BaseMessage<List<BaseMessage<Path>>> upLoadFile(@RequestParam("files") List<MultipartFile> files, @RequestParam("paths") List<String> paths) throws IOException {
-        List<BaseMessage<Path>> fileBaseItemList=new ArrayList<>();
+    public BaseMessage<List<BaseMessage<String>>> upLoadFile(@RequestParam("files") List<MultipartFile> files, @RequestParam("path") String path) throws IOException {
+        List<BaseMessage<String>> fileBaseItemList=new ArrayList<>();
         for(int i=0;i<files.size();i++){
-            Path start = Paths.get(basePath,paths.get(i));
+            Path path1=Paths.get(basePath,path);
+            if (!path1.toFile().exists()&&!path1.toFile().isDirectory()) {
+                fileBaseItemList.add(new BaseMessage<>(500,"上传失败:目录不存在", files.get(i).getOriginalFilename()));
+                continue;
+            }
+            Path start = Paths.get(basePath,path, files.get(i).getOriginalFilename());
             File dest = new File(start.toFile().getAbsolutePath());
             try {
                 files.get(i).transferTo(dest); // 保存文件
-                fileBaseItemList.add(new BaseMessage<Path>(200,"上传成功",start));
+                fileBaseItemList.add(new BaseMessage<>(200,"上传成功", files.get(i).getOriginalFilename()));
             } catch (IOException e) {
-            //TODO::日志打印错误信息
-                fileBaseItemList.add(new BaseMessage<>(500,"上传失败",start));
+                //日志打印错误信息
+                log.error(e.getMessage());
+                fileBaseItemList.add(new BaseMessage<>(500,"上传失败：没有写入权限", files.get(i).getOriginalFilename()));
         }
         }
         return new BaseMessage<>(200,"上传完毕",fileBaseItemList);
@@ -83,6 +88,7 @@ public class FileHttpController {
         try{
             Files.createDirectories(start);
         }catch (IOException e){
+            log.error(e.getMessage());
             return new BaseMessage<>(500,"创造失败",null);
         }
         return new BaseMessage<>(200,"创造成功",null);
@@ -91,30 +97,34 @@ public class FileHttpController {
 
     //TODO::重命名接口
     @PostMapping("/rename")
-    public BaseMessage<Object> rename(@RequestBody List<Map<String,String>> pathMap){
-        List<BaseMessage<Path>> fileBaseItemList=new ArrayList<>();
+    public BaseMessage<List<BaseMessage<String>>> rename(@RequestBody List<Map<String,String>> pathMap){
+        List<BaseMessage<String>> fileBaseItemList=new ArrayList<>();
         for (Map<String, String> stringStringMap : pathMap) {
             Path source = Paths.get(basePath, stringStringMap.get("targetPath"));
-            Path target = Paths.get(basePath, stringStringMap.get("targetPath"));
+            Path target = Paths.get(basePath, stringStringMap.get("newPath"));
             try {
                 Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-                fileBaseItemList.add(new BaseMessage<Path>(200, "上传成功", source));
+                fileBaseItemList.add(new BaseMessage<>(200, "移动成功", stringStringMap.get("targetPath")));
             } catch (IOException e) {
-                fileBaseItemList.add(new BaseMessage<>(500, "上传失败", source));
+                log.error(e.getMessage());
+                fileBaseItemList.add(new BaseMessage<>(500, "移动失败", stringStringMap.get("targetPath")));
             }
         }
         return new BaseMessage<>(200,"移动完毕",fileBaseItemList);
     }
     //TODO:删除接口
     @PostMapping("delete")
-    public BaseMessage<Object> delete(@RequestBody List<Map<String,String>> pathMap){
-        List<BaseMessage<Path>> fileBaseItemList=new ArrayList<>();
+    public BaseMessage<List<BaseMessage<String>>> delete(@RequestBody List<Map<String,String>> pathMap){
+        List<BaseMessage<String>> fileBaseItemList=new ArrayList<>();
         for (Map<String, String> stringStringMap : pathMap) {
             Path source = Paths.get(basePath, stringStringMap.get("deletePath"));
-            if (source.toFile().delete()) {
-                fileBaseItemList.add(new BaseMessage<>(200, "删除成功", source));
-            } else {
-                fileBaseItemList.add(new BaseMessage<>(500, "删除失败", source));
+            try{
+                Files.delete(source);
+                fileBaseItemList.add(new BaseMessage<>(200, "删除成功", stringStringMap.get("deletePath")));
+            }catch (NoSuchFileException e) {
+                fileBaseItemList.add(new BaseMessage<>(500, "删除失败:文件或目录不存在", stringStringMap.get("deletePath")));
+            } catch (IOException e) {
+                fileBaseItemList.add(new BaseMessage<>(500, "删除失败:文件或目录权限不足|文件正在被另一个进程使用", stringStringMap.get("deletePath")));
             }
         }
         return new BaseMessage<>(200,"删除完毕",fileBaseItemList);
