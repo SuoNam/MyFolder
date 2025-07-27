@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.web.servlet.ServletComponentScan;
 
 
-@SpringBootApplication
+@SpringBootApplication()
 @MapperScan("xyz.suonan.myfolder_sever.Dao")
 @ServletComponentScan  // 加上这个，@WebFilter 才能被扫描生效
 public class MyFolderSeverApplication {
