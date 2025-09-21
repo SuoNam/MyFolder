@@ -1,18 +1,18 @@
 package xyz.suonan.myfolder_sever.Filter;
+import io.micrometer.common.lang.NonNullApi;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
 import java.io.IOException;
-
+@NonNullApi
 @Component
-public class CorsFilter implements Filter {
+public class CorsFilter extends OncePerRequestFilter {
     @Override
-    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
+    public void doFilterInternal(HttpServletRequest request,  HttpServletResponse response, FilterChain chain)
             throws IOException, ServletException {
-
-        HttpServletRequest request = (HttpServletRequest) req;
-        HttpServletResponse response = (HttpServletResponse) res;
 
         String origin = request.getHeader("Origin");
         if (origin != null && !origin.isEmpty()) {
@@ -29,6 +29,6 @@ public class CorsFilter implements Filter {
             return;
         }
 
-        chain.doFilter(req, res);
+        chain.doFilter(request,response);
     }
 }

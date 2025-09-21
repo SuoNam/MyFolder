@@ -1,5 +1,4 @@
 package xyz.suonan.myfolder_sever.Controller;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -11,8 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import xyz.suonan.myfolder_sever.BaseMessage.BaseMessage;
 import xyz.suonan.myfolder_sever.Utils.WrapFileBaseItem;
-import xyz.suonan.myfolder_sever.MyObject.FileBaseItem;
-
+import xyz.suonan.myfolder_sever.MyObject.Item.FileBaseItem;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
@@ -20,11 +18,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-@Slf4j
 @RequestMapping("/file")
 @RestController
 public class FileHttpController {
-
+    private static final org.slf4j.Logger log =org.slf4j.LoggerFactory.getLogger(FileHttpController.class);
     @Value("${basePath}")
     private String basePath;
     @Autowired
@@ -62,26 +59,25 @@ public class FileHttpController {
     @PostMapping("/uploadfile")
     public BaseMessage<List<BaseMessage<String>>> upLoadFile(@RequestParam("files") List<MultipartFile> files, @RequestParam("path") String path) throws IOException {
         List<BaseMessage<String>> fileBaseItemList=new ArrayList<>();
-        for(int i=0;i<files.size();i++){
-            Path path1=Paths.get(basePath,path);
-            if (!path1.toFile().exists()&&!path1.toFile().isDirectory()) {
-                fileBaseItemList.add(new BaseMessage<>(500,"上传失败:目录不存在", files.get(i).getOriginalFilename()));
+        for (MultipartFile file : files) {
+            Path path1 = Paths.get(basePath, path);
+            if (!path1.toFile().exists() && !path1.toFile().isDirectory()) {
+                fileBaseItemList.add(new BaseMessage<>(500, "上传失败:目录不存在", file.getOriginalFilename()));
                 continue;
             }
-            Path start = Paths.get(basePath,path, files.get(i).getOriginalFilename());
+            Path start = Paths.get(basePath, path, file.getOriginalFilename());
             File dest = new File(start.toFile().getAbsolutePath());
             try {
-                files.get(i).transferTo(dest); // 保存文件
-                fileBaseItemList.add(new BaseMessage<>(200,"上传成功", files.get(i).getOriginalFilename()));
+                file.transferTo(dest); // 保存文件
+                fileBaseItemList.add(new BaseMessage<>(200, "上传成功", file.getOriginalFilename()));
             } catch (IOException e) {
                 //日志打印错误信息
                 log.error(e.getMessage());
-                fileBaseItemList.add(new BaseMessage<>(500,"上传失败：没有写入权限", files.get(i).getOriginalFilename()));
-        }
+                fileBaseItemList.add(new BaseMessage<>(500, "上传失败：没有写入权限", file.getOriginalFilename()));
+            }
         }
         return new BaseMessage<>(200,"上传完毕",fileBaseItemList);
     }
-    //TODO::新建文件夹的接口
     @PostMapping("/createfolder")
     public BaseMessage<Object> createNewFile(@RequestBody Map<String,String> pathMap) throws IOException {
         Path start = Paths.get(basePath,pathMap.get("path"));
@@ -94,8 +90,6 @@ public class FileHttpController {
         return new BaseMessage<>(200,"创造成功",null);
 
     }
-
-    //TODO::重命名接口
     @PostMapping("/rename")
     public BaseMessage<List<BaseMessage<String>>> rename(@RequestBody List<Map<String,String>> pathMap){
         List<BaseMessage<String>> fileBaseItemList=new ArrayList<>();
@@ -112,7 +106,6 @@ public class FileHttpController {
         }
         return new BaseMessage<>(200,"移动完毕",fileBaseItemList);
     }
-    //TODO:删除接口
     @PostMapping("delete")
     public BaseMessage<List<BaseMessage<String>>> delete(@RequestBody List<Map<String,String>> pathMap){
         List<BaseMessage<String>> fileBaseItemList=new ArrayList<>();

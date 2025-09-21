@@ -11,11 +11,16 @@ import java.nio.file.Path;
 
 @SpringBootTest
 public class Ziptest {
-        @Autowired
-        FileZipService fileZipService;
+    @Autowired
+    FileZipService fileZipService;
 
-       @Test
-        public void testGenZip() throws IOException {
-            fileZipService.zipFolder(Path.of("C:\\Users\\Lenovo\\Desktop\\test"), Path.of("C:\\Users\\Lenovo\\Desktop\\test.zip"));
-       }
+    @Test
+    public void testGenZip() throws IOException {
+        fileZipService.zipFolder(Path.of("C:\\Users\\Lenovo\\Desktop\\test"), Path.of("C:\\Users\\Lenovo\\Desktop\\test.zip"));
+    }
+
+    @Test
+    public void testUnZip() throws IOException {
+        fileZipService.unzip( Path.of("C:\\Users\\Lenovo\\Desktop\\test.zip"),Path.of("C:\\Users\\Lenovo\\Desktop\\test2"));
+    }
 }

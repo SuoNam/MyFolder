@@ -11,8 +11,8 @@ public class FilterConfig  {
     public FilterRegistrationBean<CorsFilter> corsFilterRegistration(CorsFilter corsFilter) {
         FilterRegistrationBean<CorsFilter> registrationBean = new FilterRegistrationBean<>();
         registrationBean.setFilter(corsFilter);
-        registrationBean.addUrlPatterns("/*"); // 所有请求都应用 CORS
-        registrationBean.setOrder(1); // 比 TokenFilter 更早执行
+        registrationBean.addUrlPatterns("/*");
+        registrationBean.setOrder(1);
         return registrationBean;
     }
 

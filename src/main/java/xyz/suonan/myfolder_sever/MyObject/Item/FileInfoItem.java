@@ -1,14 +1,15 @@
-package xyz.suonan.myfolder_sever.MyObject;
+package xyz.suonan.myfolder_sever.MyObject.Item;
+
 import java.nio.file.Path;
 import java.util.Date;
-public class MyFile implements FileBaseItem{
+public class FileInfoItem implements FileBaseItem {
 
   private String type;
   private String fileName;
   public long size;
   public Date lastModified;
   private Path  path;
-  public MyFile(String type, String fileName, long size, Date lastModified,Path path) {
+  public FileInfoItem(String type, String fileName, long size, Date lastModified, Path path) {
     this.type = type;
     this.fileName = fileName;
     this.size = size;

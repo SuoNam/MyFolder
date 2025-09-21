@@ -30,21 +30,20 @@ public class FileZipService {
         }
     }
 
-    public void unzip(String zipFilePath, String destDir) throws IOException {
-        File dir = new File(destDir);
+    public void unzip(Path zipFilePath, Path destDir) throws IOException {
+        File dir = destDir.toFile();
         if (!dir.exists()) dir.mkdirs();
 
         try (
-                FileInputStream fis = new FileInputStream(zipFilePath);
+                FileInputStream fis = new FileInputStream(zipFilePath.toFile());
                 ZipInputStream zis = new ZipInputStream(fis)
         ) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                File newFile = new File(destDir, entry.getName());
+                File newFile = Paths.get(destDir.toString(), entry.getName()).toFile();
                 if (entry.isDirectory()) {
                     newFile.mkdirs();
                 } else {
-                    // 创建所有父级目录
                     new File(newFile.getParent()).mkdirs();
                     try (FileOutputStream fos = new FileOutputStream(newFile)) {
                         byte[] buffer = new byte[1024];

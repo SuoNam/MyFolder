@@ -3,9 +3,9 @@ package xyz.suonan.myfolder_sever.Utils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import xyz.suonan.myfolder_sever.MyObject.Directory;
-import xyz.suonan.myfolder_sever.MyObject.FileBaseItem;
-import xyz.suonan.myfolder_sever.MyObject.MyFile;
+import xyz.suonan.myfolder_sever.MyObject.Item.DirectoryItem;
+import xyz.suonan.myfolder_sever.MyObject.Item.FileBaseItem;
+import xyz.suonan.myfolder_sever.MyObject.Item.FileInfoItem;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -27,10 +27,10 @@ public class WrapFileBaseItem {
             return null;
         }
         else if(file.isDirectory()){
-            return new Directory(file.getName(),"Directory",this.basePath.relativize(ItemPath),new Date(file.lastModified()));
+            return new DirectoryItem(file.getName(),"Directory",this.basePath.relativize(ItemPath),new Date(file.lastModified()));
         }
         else if(file.isFile()){
-            return new MyFile("File",file.getName(),file.length(),new Date(file.lastModified()),this.basePath.relativize(ItemPath));
+            return new FileInfoItem("File",file.getName(),file.length(),new Date(file.lastModified()),this.basePath.relativize(ItemPath));
         }
         else{
             return null;

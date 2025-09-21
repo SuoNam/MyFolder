@@ -9,7 +9,7 @@ import org.springframework.boot.web.servlet.ServletComponentScan;
 
 @SpringBootApplication()
 @MapperScan("xyz.suonan.myfolder_sever.Dao")
-@ServletComponentScan  // 加上这个，@WebFilter 才能被扫描生效
+@ServletComponentScan
 public class MyFolderSeverApplication {
     public static void main(String[] args) {
         SpringApplication.run(MyFolderSeverApplication.class, args);

@@ -26,7 +26,6 @@ public class UserController {
         if(!userService.addUser(user)){
             return new BaseMessage<>(500,"注册失败",null);
         }
-        //TODO::添加注册成功返回Token
         Map<String,String> tokenMap = new HashMap<>();
         tokenMap.put("token",jwtGen.genJwt(user.account));
         return new BaseMessage<>(200,"注册成功",tokenMap);
@@ -36,7 +35,6 @@ public class UserController {
         if(!userService.JudgeUser(user)){
             return new BaseMessage<>(500,"登录失败",null);
         }
-        //TODO::添加登录成功返回Token
         Map<String,String> tokenMap = new HashMap<>();
         tokenMap.put("token",jwtGen.genJwt(user.account));
         return new BaseMessage<>(200,"登录成功",tokenMap);

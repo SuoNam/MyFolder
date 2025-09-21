@@ -1,6 +1,4 @@
-package xyz.suonan.myfolder_sever.MyObject;
-
-import java.nio.file.Path;
+package xyz.suonan.myfolder_sever.MyObject.Item;
 
 public interface FileBaseItem {
     public String getType();

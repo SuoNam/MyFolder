@@ -4,8 +4,6 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Select;
 import xyz.suonan.myfolder_sever.pojo.User;
 
-import java.util.List;
-
 public interface UserDao {
     @Insert("insert into user values (#{account},#{password})")
     void insert(User user);
