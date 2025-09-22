@@ -1,0 +1,122 @@
+# ninja log v6
+1979	3160	7802157205358317	meta_types/appMyTest_json_file_list.txt	c072c3f685c67b46
+57	222	7802157187671924	.qt/appMyTest_qml.txt	f3a898c4886f9c02
+1295	1977	7802157198514693	appMyTest_autogen/mocs_compilation.cpp	3c2e4ddf3cbe63a7
+1672	2382	7760564170797951	MyTest/appMyTest.qmltypes	c604e6ee677a103f
+57	222	7802157187671924	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/appMyTest_qml.txt	f3a898c4886f9c02
+1301	1937	7768384864563858	.rcc/qmlcache/appMyTest_MyButton_qml.cpp	390544cdc7a05454
+4069	9697	7802157226250064	CMakeFiles/appMyTest.dir/main.cpp.obj	9614c5acfbd0d851
+3683	4905	7760564188029442	CMakeFiles/appMyTest.dir/folderwatcher.cpp.obj	f416e3ce3d853cc3
+67	1295	7802157198338610	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/qml_imports/appMyTest_build.cmake	87c9a2c30a1b2ba6
+1990	3329	7802157218751669	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_appMyTest_raw_qml_0.cpp	38babad65baafb7e
+19	282	7768381283139796	.qt/appMyTest_res.txt	cdc1be7198c9243d
+2978	4904	7760564180977494	CMakeFiles/appMyTest.dir/appMyTest_autogen/mocs_compilation.cpp.obj	c11875d7cc0bdaa3
+19	282	7768381283139796	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/appMyTest_res.txt	cdc1be7198c9243d
+3160	4068	7802157226083830	.rcc/qmlcache/appMyTest_Main_qml.cpp	e2b98ea6588c7c57
+67	1295	7802157198338610	.qt/qml_imports/appMyTest_build.cmake	87c9a2c30a1b2ba6
+2334	5970	7768384868640333	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_MyButton_qml.cpp.obj	17f5c322f6e1ad4e
+1307	1915	7768384864301553	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_test_qml.cpp	b683016ec718a659
+1295	1977	7802157198514693	appMyTest_autogen/timestamp	3c2e4ddf3cbe63a7
+4080	9420	7802157226382009	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp.obj	286b347650be6d14
+1295	1977	7802157198514693	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/appMyTest_autogen/timestamp	3c2e4ddf3cbe63a7
+1295	1977	7802157198514693	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/appMyTest_autogen/mocs_compilation.cpp	3c2e4ddf3cbe63a7
+1307	1915	7768384864301553	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_test_qml.cpp.aotstats	b683016ec718a659
+1979	3160	7802157205358317	meta_types/appMyTest_json_file_list.txt.timestamp	c072c3f685c67b46
+1979	3160	7802157205358317	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/meta_types/appMyTest_json_file_list.txt	c072c3f685c67b46
+380	877	7769693183644871	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_InputText_qml.cpp.aotstats	774f4f51866b0bb9
+1979	3160	7802157205358317	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/meta_types/appMyTest_json_file_list.txt.timestamp	c072c3f685c67b46
+1301	1937	7768384864563858	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_MyButton_qml.cpp.aotstats	390544cdc7a05454
+1061	1325	7768384858421833	.rcc/qmlcache/appMyTest_qmlcache_loader.cpp	dbb93e77f84d2f1c
+1061	1325	7768384858421833	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_qmlcache_loader.cpp	dbb93e77f84d2f1c
+1194	1518	7760183300544898	.qt/rcc/qrc_qmake_MyTest.cpp	7b7dd11d7d237af8
+1990	3329	7802157218751669	.qt/rcc/qrc_appMyTest_raw_qml_0.cpp	38babad65baafb7e
+1194	1518	7760183300544898	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_qmake_MyTest.cpp	7b7dd11d7d237af8
+2253	2672	7758449095737184	meta_types/qt6appmytest_debug_metatypes.json.gen	397e4ec459683f14
+2253	2672	7758449095737184	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/meta_types/qt6appmytest_debug_metatypes.json.gen	397e4ec459683f14
+380	877	7769693183644871	.rcc/qmlcache/appMyTest_InputText_qml.cpp	774f4f51866b0bb9
+2253	2672	7758449095737184	meta_types/qt6appmytest_debug_metatypes.json	397e4ec459683f14
+2253	2672	7758449095737184	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/meta_types/qt6appmytest_debug_metatypes.json	397e4ec459683f14
+9698	13467	7802157282549038	appMyTest.exe	4c3e7e73f8dfcbbc
+1672	2382	7760564170797951	appmytest_qmltyperegistrations.cpp	c604e6ee677a103f
+380	877	7769693183644871	.rcc/qmlcache/appMyTest_InputText_qml.cpp.aotstats	774f4f51866b0bb9
+1672	2382	7760564170797951	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/appmytest_qmltyperegistrations.cpp	c604e6ee677a103f
+1672	2382	7760564170797951	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/MyTest/appMyTest.qmltypes	c604e6ee677a103f
+3160	4068	7802157226083830	.rcc/qmlcache/appMyTest_Main_qml.cpp.aotstats	e2b98ea6588c7c57
+2478	6085	7768384870077730	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_test_qml.cpp.obj	a146ca121d657459
+3160	4068	7802157226083830	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp	e2b98ea6588c7c57
+3160	4068	7802157226083830	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp.aotstats	e2b98ea6588c7c57
+4103	5180	7802157226606080	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_appMyTest_raw_qml_0.cpp.obj	2cba38f1750b5d08
+1301	1937	7768384864563858	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_MyButton_qml.cpp	390544cdc7a05454
+3470	4905	7760564185897595	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_qmake_MyTest.cpp.obj	380603b6833dc568
+3279	7208	7760564183987885	CMakeFiles/appMyTest.dir/appmytest_qmltyperegistrations.cpp.obj	6dd07fe0310fd7c9
+1937	6061	7768384864659127	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_qmlcache_loader.cpp.obj	255342e6bd412ba1
+380	877	7769693183644871	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_InputText_qml.cpp	774f4f51866b0bb9
+1004	3741	7769693185001392	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_InputText_qml.cpp.obj	dc0f7942aa495b5a
+1301	1937	7768384864563858	.rcc/qmlcache/appMyTest_MyButton_qml.cpp.aotstats	390544cdc7a05454
+1307	1915	7768384864301553	.rcc/qmlcache/appMyTest_test_qml.cpp	b683016ec718a659
+1307	1915	7768384864301553	.rcc/qmlcache/appMyTest_test_qml.cpp.aotstats	b683016ec718a659
+35	223	7802158144848344	.qt/appMyTest_res.txt	cdc1be7198c9243d
+35	223	7802158144848344	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/appMyTest_res.txt	cdc1be7198c9243d
+46	623	7802158148837783	.qt/qml_imports/appMyTest_build.cmake	87c9a2c30a1b2ba6
+46	623	7802158148837783	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/qml_imports/appMyTest_build.cmake	87c9a2c30a1b2ba6
+623	1261	7802158148956281	appMyTest_autogen/timestamp	3c2e4ddf3cbe63a7
+623	1261	7802158148956281	appMyTest_autogen/mocs_compilation.cpp	3c2e4ddf3cbe63a7
+623	1261	7802158148956281	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/appMyTest_autogen/timestamp	3c2e4ddf3cbe63a7
+623	1261	7802158148956281	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/appMyTest_autogen/mocs_compilation.cpp	3c2e4ddf3cbe63a7
+1262	1416	7802158155345272	meta_types/appMyTest_json_file_list.txt	c072c3f685c67b46
+1262	1416	7802158155345272	meta_types/appMyTest_json_file_list.txt.timestamp	c072c3f685c67b46
+1262	1416	7802158155345272	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/meta_types/appMyTest_json_file_list.txt	c072c3f685c67b46
+1262	1416	7802158155345272	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/meta_types/appMyTest_json_file_list.txt.timestamp	c072c3f685c67b46
+1282	1480	7802158157391990	.qt/rcc/qrc_appMyTest_raw_qml_0.cpp	38babad65baafb7e
+1282	1480	7802158157391990	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_appMyTest_raw_qml_0.cpp	38babad65baafb7e
+1272	1481	7802158157307621	.rcc/qmlcache/appMyTest_qmlcache_loader.cpp	dbb93e77f84d2f1c
+1272	1481	7802158157307621	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_qmlcache_loader.cpp	dbb93e77f84d2f1c
+1451	1763	7802158160182323	.rcc/qmlcache/appMyTest_MyButton_qml.cpp	390544cdc7a05454
+1451	1763	7802158160182323	.rcc/qmlcache/appMyTest_MyButton_qml.cpp.aotstats	390544cdc7a05454
+1451	1763	7802158160182323	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_MyButton_qml.cpp	390544cdc7a05454
+1451	1763	7802158160182323	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_MyButton_qml.cpp.aotstats	390544cdc7a05454
+1436	1770	7802158160257686	.rcc/qmlcache/appMyTest_InputText_qml.cpp	774f4f51866b0bb9
+1436	1770	7802158160257686	.rcc/qmlcache/appMyTest_InputText_qml.cpp.aotstats	774f4f51866b0bb9
+1436	1770	7802158160257686	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_InputText_qml.cpp	774f4f51866b0bb9
+1436	1770	7802158160257686	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_InputText_qml.cpp.aotstats	774f4f51866b0bb9
+1464	1776	7802158160311814	.rcc/qmlcache/appMyTest_test_qml.cpp	b683016ec718a659
+1464	1776	7802158160311814	.rcc/qmlcache/appMyTest_test_qml.cpp.aotstats	b683016ec718a659
+1464	1776	7802158160311814	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_test_qml.cpp	b683016ec718a659
+1464	1776	7802158160311814	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_test_qml.cpp.aotstats	b683016ec718a659
+1416	1777	7802158160300045	.rcc/qmlcache/appMyTest_Main_qml.cpp	e2b98ea6588c7c57
+1416	1777	7802158160300045	.rcc/qmlcache/appMyTest_Main_qml.cpp.aotstats	e2b98ea6588c7c57
+1416	1777	7802158160300045	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp	e2b98ea6588c7c57
+1416	1777	7802158160300045	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp.aotstats	e2b98ea6588c7c57
+1851	2104	7802158161239053	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_appMyTest_raw_qml_0.cpp.obj	2cba38f1750b5d08
+1836	9000	7802158161089387	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_test_qml.cpp.obj	a146ca121d657459
+1791	9185	7802158160631486	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp.obj	286b347650be6d14
+1820	9187	7802158160922001	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_MyButton_qml.cpp.obj	17f5c322f6e1ad4e
+1804	9190	7802158160765424	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_InputText_qml.cpp.obj	dc0f7942aa495b5a
+1777	9706	7802158160494277	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_qmlcache_loader.cpp.obj	255342e6bd412ba1
+9706	10858	7802158239792666	appMyTest.exe	4c3e7e73f8dfcbbc
+37	196	7802160202450984	.qt/appMyTest_qml.txt	f3a898c4886f9c02
+37	196	7802160202450984	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/appMyTest_qml.txt	f3a898c4886f9c02
+50	659	7802160207077452	.qt/qml_imports/appMyTest_build.cmake	87c9a2c30a1b2ba6
+50	659	7802160207077452	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/qml_imports/appMyTest_build.cmake	87c9a2c30a1b2ba6
+668	849	7802160208877650	.qt/rcc/qrc_appMyTest_raw_qml_0.cpp	38babad65baafb7e
+668	849	7802160208877650	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_appMyTest_raw_qml_0.cpp	38babad65baafb7e
+659	968	7802160210101833	.rcc/qmlcache/appMyTest_Main_qml.cpp	e2b98ea6588c7c57
+659	968	7802160210101833	.rcc/qmlcache/appMyTest_Main_qml.cpp.aotstats	e2b98ea6588c7c57
+659	968	7802160210101833	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp	e2b98ea6588c7c57
+659	968	7802160210101833	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp.aotstats	e2b98ea6588c7c57
+981	1175	7802160210437808	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_appMyTest_raw_qml_0.cpp.obj	2cba38f1750b5d08
+968	5747	7802160210295711	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp.obj	286b347650be6d14
+5748	6678	7802160258096796	appMyTest.exe	4c3e7e73f8dfcbbc
+40	222	7802164160621540	.qt/appMyTest_qml.txt	f3a898c4886f9c02
+40	222	7802164160621540	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/appMyTest_qml.txt	f3a898c4886f9c02
+50	680	7802164165224455	.qt/qml_imports/appMyTest_build.cmake	87c9a2c30a1b2ba6
+50	680	7802164165224455	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/qml_imports/appMyTest_build.cmake	87c9a2c30a1b2ba6
+690	850	7802164166957866	.qt/rcc/qrc_appMyTest_raw_qml_0.cpp	38babad65baafb7e
+690	850	7802164166957866	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_appMyTest_raw_qml_0.cpp	38babad65baafb7e
+680	995	7802164168336811	.rcc/qmlcache/appMyTest_Main_qml.cpp	e2b98ea6588c7c57
+680	995	7802164168336811	.rcc/qmlcache/appMyTest_Main_qml.cpp.aotstats	e2b98ea6588c7c57
+680	995	7802164168336811	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp	e2b98ea6588c7c57
+680	995	7802164168336811	G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp.aotstats	e2b98ea6588c7c57
+1007	1202	7802164168645734	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qt/rcc/qrc_appMyTest_raw_qml_0.cpp.obj	2cba38f1750b5d08
+995	5698	7802164168531598	CMakeFiles/appMyTest.dir/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.rcc/qmlcache/appMyTest_Main_qml.cpp.obj	286b347650be6d14
+5699	6646	7802164215562082	appMyTest.exe	4c3e7e73f8dfcbbc

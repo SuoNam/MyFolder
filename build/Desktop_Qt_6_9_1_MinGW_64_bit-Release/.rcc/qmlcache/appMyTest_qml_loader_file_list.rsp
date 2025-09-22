@@ -1,0 +1,8 @@
+--resource
+G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Release/.qt/rcc/qmake_MyTest.qrc
+--resource
+G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Release/.qt/rcc/appMyTest_raw_qml_0.qrc
+/qt/qml/MyTest/Main.qml
+/qt/qml/MyTest/InputText.qml
+/qt/qml/MyTest/MyButton.qml
+/qt/qml/MyTest/test.qml

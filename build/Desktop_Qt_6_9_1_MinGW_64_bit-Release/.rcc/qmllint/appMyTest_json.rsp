@@ -1,0 +1,15 @@
+--bare
+-I
+G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Release
+-I
+G:/Qt/6.9.1/mingw_64/qml
+--resource
+G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Release/.qt/rcc/qmake_MyTest.qrc
+--resource
+G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Release/.qt/rcc/appMyTest_raw_qml_0.qrc
+G:/vs/qt/exercise file/MyTest/Main.qml
+G:/vs/qt/exercise file/MyTest/InputText.qml
+G:/vs/qt/exercise file/MyTest/MyButton.qml
+G:/vs/qt/exercise file/MyTest/test.qml
+--json
+G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Release/appMyTest_qmllint.json

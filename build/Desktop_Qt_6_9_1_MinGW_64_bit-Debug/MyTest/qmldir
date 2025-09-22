@@ -1,0 +1,7 @@
+module MyTest
+typeinfo appMyTest.qmltypes
+prefer :/qt/qml/MyTest/
+Main 1.0 Main.qml
+InputText 1.0 InputText.qml
+MyButton 1.0 MyButton.qml
+
