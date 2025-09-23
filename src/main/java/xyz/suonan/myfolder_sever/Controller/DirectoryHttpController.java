@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import xyz.suonan.myfolder_sever.BaseMessage.BaseMessage;
 import xyz.suonan.myfolder_sever.Error.ErrorType;
+import xyz.suonan.myfolder_sever.MyObject.FileInfoResponse;
 import xyz.suonan.myfolder_sever.MyObject.FileInfoUpload;
 import xyz.suonan.myfolder_sever.Service.DirectoryInfoService;
+import xyz.suonan.myfolder_sever.Service.FileInfoService;
 import xyz.suonan.myfolder_sever.Utils.FileZipService;
 import xyz.suonan.myfolder_sever.Utils.IdGen;
 import xyz.suonan.myfolder_sever.pojo.DirectoryInfo;
@@ -30,6 +32,8 @@ public class DirectoryHttpController {
     FileZipService fileZipService;
     @Autowired
     DirectoryInfoService directoryInfoService;
+    @Autowired
+    FileInfoService fileInfoService;
     @Value("${basePath}")
     private String basePath;
     @GetMapping("/downloaddirectory")
@@ -72,7 +76,7 @@ public class DirectoryHttpController {
         return new BaseMessage<>(200,"创建成功",map);
     }
     @PostMapping("/filesInfo")
-    public BaseMessage<Map<String,String>> filesInfo(@RequestParam  String uploadId,
+    public BaseMessage<List<FileInfoResponse>> filesInfo(@RequestParam  String uploadId,
                                                      @RequestBody Map<String, List<FileInfoUpload>> filesInfo) {
         //TODO::查询uploadId是否存在
         if(!directoryInfoService.UuidIsExist(uploadId)){
@@ -80,13 +84,18 @@ public class DirectoryHttpController {
         }
         //TODO::遍历files数据库 若已经存在则标记其秒传并记录其秒传文件路径 若没有则标记其需要传输
         List<FileInfoUpload> files =filesInfo.get("entries");
-
+        List<FileInfoResponse> data = new ArrayList<>();
         for (FileInfoUpload fileInfoUpload : files) {
-            String fileInfoUploadSha256=fileInfoUpload.getSha256();
+            FileInfoResponse fileInfoResponse = new FileInfoResponse(fileInfoUpload.getPath(),fileInfoUpload.getSha256());
+            if(!fileInfoService.sha256isExists(fileInfoUpload)){
+                fileInfoResponse.setExists(false);
+            }
+            fileInfoResponse.setExists(false);
+            data.add(fileInfoResponse);
         }
 
         //TODO::返回
-        return new BaseMessage<>(200,"创建成功",null);
+        return new BaseMessage<>(200,"创建成功",data);
     }
 
     @PutMapping("/{uploadId}/chunks/{pageNumber}")

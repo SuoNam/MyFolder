@@ -4,9 +4,9 @@ public class FileInfo implements FileBase{
     public String path;
     public long size;
     public long mtime;
-    public String sha256;
+    public byte[] sha256;
 
-    public FileInfo(String path, long size, long mtime, String sha256) {
+    public FileInfo(String path, long size, long mtime, byte[] sha256) {
         this.path = path;
         this.size = size;
         this.mtime = mtime;
@@ -15,11 +15,11 @@ public class FileInfo implements FileBase{
 
     @Override
     public String getPath() {
-        return "";
+        return path;
     }
 
     @Override
-    public String getSha256() {
-        return "";
+    public byte[] getSha256() {
+        return sha256;
     }
 }
