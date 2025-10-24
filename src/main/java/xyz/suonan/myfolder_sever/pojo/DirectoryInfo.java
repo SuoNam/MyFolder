@@ -19,26 +19,16 @@ public class DirectoryInfo {
     public int chunkSize;
     public long totalBytes;
     public String parentPath;
-    public String manifestSummaryHash;
-    @Setter(lombok.AccessLevel.NONE) // 防止 Lombok 生成 setOptions(String) 与我们自定义冲突
-    @JsonRawValue                    // 序列化时按原始 JSON 输出（不再加引号）
-    String options;
     public int status;
     public Date creationDate;
 
-    public DirectoryInfo(String directoryName,int totalFiles,int chunkSize,long totalBytes,String parentPath,String manifestSummaryHash,String options) {
+    public DirectoryInfo(String directoryName,int totalFiles,int chunkSize,long totalBytes,String parentPath) {
             this.directoryName = directoryName.trim();
             this.totalFiles = totalFiles;
             this.chunkSize = chunkSize;
             this.totalBytes = totalBytes;
             this.parentPath = parentPath;
-            this.manifestSummaryHash = manifestSummaryHash;
-            this.options = options;
             this.status = 0;
-    }
-    @JsonProperty("options")
-    public void setOptions(Object options) throws JsonProcessingException {
-        this.options = new ObjectMapper().writeValueAsString(options);
     }
 
 }

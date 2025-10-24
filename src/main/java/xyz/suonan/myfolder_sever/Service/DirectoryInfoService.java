@@ -16,7 +16,7 @@ public class DirectoryInfoService {
     public int addDirectoryInfo(DirectoryInfo directoryInfo) {
         try{
             directoryInfoDao.insert(directoryInfo);
-        } catch (PersistenceException e){
+        } catch (Exception e){
             Throwable cause = e.getCause();
             return SqlError.resolve(cause);
         }

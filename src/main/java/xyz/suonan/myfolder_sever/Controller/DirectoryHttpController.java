@@ -65,6 +65,7 @@ public class DirectoryHttpController {
     public BaseMessage<Object> upLoadDirectory(@RequestBody DirectoryInfo directoryInfo) {
         directoryInfo.setId(IdGen.generateId());
         directoryInfo.setCreationDate(new Date());
+
         int code=directoryInfoService.addDirectoryInfo(directoryInfo);
         if(code!=1){
             return new BaseMessage<>(500,"创建失败", ErrorType.resolve(code,"sql"));
@@ -78,7 +79,6 @@ public class DirectoryHttpController {
     @PostMapping("/filesInfo")
     public BaseMessage<List<FileInfoResponse>> filesInfo(@RequestParam  String uploadId,
                                                      @RequestBody Map<String, List<FileInfoUpload>> filesInfo) {
-        //TODO::查询uploadId是否存在
         if(!directoryInfoService.UuidIsExist(uploadId)){
             return new BaseMessage<>(200,"uuid不存在",null);
         }

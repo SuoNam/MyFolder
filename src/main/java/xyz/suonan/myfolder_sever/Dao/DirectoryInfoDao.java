@@ -10,10 +10,10 @@ public interface DirectoryInfoDao {
     @Insert("""
         INSERT INTO directory_info
         (id, directory_name, total_files, chunk_size, total_bytes,
-         parent_path, manifest_summary_hash, options, status, creation_date)
+         parent_path,status, creation_date)
         VALUES
         (#{id}, #{directoryName}, #{totalFiles}, #{chunkSize}, #{totalBytes},
-         #{parentPath}, #{manifestSummaryHash}, CAST(#{options} as json), #{status}, #{creationDate})
+         #{parentPath}, #{status}, #{creationDate})
         """)
     int insert(DirectoryInfo directoryInfo);
 
