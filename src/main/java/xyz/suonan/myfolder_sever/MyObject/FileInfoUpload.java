@@ -5,6 +5,7 @@ import lombok.Setter;
 
 
 public class FileInfoUpload extends FileInfo {
+    @Getter @Setter
     public int totalChunks;
     public FileInfoUpload(String path, byte[] sha256, long size, long mtime,int totalChunks) {
         super(path, size, mtime,sha256);

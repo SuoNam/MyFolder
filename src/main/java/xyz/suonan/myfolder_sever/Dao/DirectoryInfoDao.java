@@ -22,4 +22,9 @@ public interface DirectoryInfoDao {
         select  id  from directory_info where id=#{uuid}
 """)
     List<String> selectAll(String uuid);
+
+    @Select("""
+            select directory_name from directory_info where id=#{uuid}
+""")
+    List<String> selectNameByID(String uuid);
 }

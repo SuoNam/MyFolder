@@ -1,5 +1,8 @@
 package xyz.suonan.myfolder_sever.MyObject;
 
+import lombok.Data;
+
+@Data
 public class FileInfo implements FileBase{
     public String path;
     public long size;
