@@ -27,6 +27,7 @@ import xyz.suonan.myfolder_sever.Utils.IdGen;
 import xyz.suonan.myfolder_sever.pojo.DirectoryInfo;
 
 import java.io.*;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -156,8 +157,9 @@ public class DirectoryHttpController {
         Map<String,String> sha26Map = new HashMap<>();
         sha26Map.put("sha256",chunkSha256);
         InputStream inputStream = new ByteArrayInputStream(chunkData);
-
-        FolderFileWriteTask fileWriteTask=new FolderFileWriteTask(request.getHeader("X-File-Path"),uploadId,
+        String encodedPath = request.getHeader("X-File-Path");
+        String filePath = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
+        FolderFileWriteTask fileWriteTask=new FolderFileWriteTask(filePath,uploadId,
                 pageNumber,request.getIntHeader("X-Total-Parts"),inputStream,Offset,fileChunkWriter,fileChunkBitmapService);
         //加入线程池
         fileTaskExecutor.submit(fileWriteTask);
