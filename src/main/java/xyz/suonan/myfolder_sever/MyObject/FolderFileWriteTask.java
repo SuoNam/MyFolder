@@ -25,6 +25,6 @@ public class FolderFileWriteTask implements WriteTask {
         }catch(Exception e){
             e.printStackTrace();
         }
-        bitmapService.setFileChunkBitmap(uploadId,path,chunkIndex-1,true);
+        bitmapService.setFileChunkBitmap(uploadId,path,chunkIndex,true);
     }
 }

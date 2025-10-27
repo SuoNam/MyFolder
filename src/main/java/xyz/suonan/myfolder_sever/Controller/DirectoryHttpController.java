@@ -35,10 +35,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RequestMapping("/directory")
 @RestController
 public class DirectoryHttpController {
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition condition = lock.newCondition();
     @Autowired
     FileZipService fileZipService;
     @Autowired
@@ -61,6 +69,7 @@ public class DirectoryHttpController {
     ObjectMapper objectMapper;
     @Value("${basePath}")
     private String basePath;
+    private static final Logger log = LoggerFactory.getLogger(DirectoryHttpController.class);
     @GetMapping("/downloaddirectory")
     public ResponseEntity<StreamingResponseBody> downLoadDirectory(@RequestParam String directoryPathS) throws IOException {
         Path sourcePath = Paths.get(basePath, directoryPathS).normalize();
@@ -123,9 +132,11 @@ public class DirectoryHttpController {
                     Files.createDirectories(targetFile.getParent());
                     Files.copy(sourceFile,targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
                 }catch (IOException e) {
+                    directoryInfoService.deleteDirectoryInfo(uploadId);
                     throw new RuntimeException("复制文件失败: " + e.getMessage(), e);
                 }
                 //添加文件元信息到file_info
+                //TODO::添加文件元信息到directory_file中
                 fileInfoUpload.setPath(String.valueOf(Paths.get(basePath,fileInfoUpload.getPath())));
                 fileInfoService.insertFileInfo(fileInfoUpload);
             }
@@ -151,16 +162,18 @@ public class DirectoryHttpController {
             HttpServletRequest request) throws IOException {
         //创建写任务 X-File-Path X-Total-Parts pageNumber Content-Range Content-sha256 content
         byte[] chunkData = request.getInputStream().readAllBytes();
-
         int Offset= Integer.parseInt(request.getHeader("Content-Range").split("-")[0]);
+        System.out.println("Offset:"+Offset);
+        int totalChunks=request.getIntHeader("X-Total-Parts");
         String chunkSha256=request.getHeader("Content-sha256");
         Map<String,String> sha26Map = new HashMap<>();
         sha26Map.put("sha256",chunkSha256);
         InputStream inputStream = new ByteArrayInputStream(chunkData);
         String encodedPath = request.getHeader("X-File-Path");
         String filePath = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
+
         FolderFileWriteTask fileWriteTask=new FolderFileWriteTask(filePath,uploadId,
-                pageNumber,request.getIntHeader("X-Total-Parts"),inputStream,Offset,fileChunkWriter,fileChunkBitmapService);
+                pageNumber,totalChunks,inputStream,Offset,fileChunkWriter,fileChunkBitmapService);
         //加入线程池
         fileTaskExecutor.submit(fileWriteTask);
 
@@ -170,16 +183,23 @@ public class DirectoryHttpController {
     }
 
     @PostMapping("/{uploadId}/chunks/complete")
-    public BaseMessage<Map<String,String>> completeChunk(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws JsonProcessingException {
+    public BaseMessage<Map<String,String>> completeChunk(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws JsonProcessingException, InterruptedException {
         String path=completeChunk.get("filePath");
-        int totalChunks=Integer.parseInt(completeChunk.get("totalChunks"));
+        int totalChunks=Integer.parseInt(completeChunk.get("totalParts"));
         long fileSize=Long.parseLong(completeChunk.get("fileSize"));
+
 
         String completePath=String.valueOf(Paths.get(basePath,path));
         Map<String,String> map=new HashMap<>();
+        log.info("/{uploadId}/chunks/complete");
+        log.info(path);
+        log.info(String.valueOf(totalChunks));
+        log.info(String.valueOf(fileSize));
+        log.info(completePath);
         //检测位点图是否完整
+        //添加看是线程没写完导致的还是前端没有发过来
         Map<String,Object>bitmapCheckResult=fileChunkBitmapService.isComplete(uploadId,path,totalChunks);
-        if(Boolean.FALSE.equals(bitmapCheckResult.get("isComplete"))){
+        if(Boolean.FALSE.equals(bitmapCheckResult.get("isComplete"))&&fileTaskExecutor.getThreadActiveCount()==0){
             //获取哪些切片缺少
             List<Integer> missChunks= (List<Integer>) bitmapCheckResult.get("missChunks");
             //返回前端
@@ -187,16 +207,36 @@ public class DirectoryHttpController {
             missChunksMap.put("missChunks",missChunks);
             String missChunksJson=objectMapper.writeValueAsString(missChunksMap);
             map.put("data",missChunksJson);
+            directoryInfoService.deleteDirectoryInfo(uploadId);
             return new BaseMessage<>(500,"切片不完整",map);
         }
 
+        //等待所有线程写完或者位图已满
+        lock.lock();
+        try {
+            while (true) {
+                boolean isComplete = (Boolean) fileChunkBitmapService
+                        .isComplete(uploadId, path, totalChunks)
+                        .get("isComplete");
+                int activeCount = fileTaskExecutor.getThreadActiveCount();
+
+                if (isComplete && activeCount == 0) break;
+
+                condition.await(100, TimeUnit.MILLISECONDS);
+            }
+        } finally {
+            lock.unlock();
+        }
+
+        Thread.sleep(100);
         //文件完整性检验
         if(!fileChunksCheck.check(completePath)){
+            directoryInfoService.deleteDirectoryInfo(uploadId);
             return new BaseMessage<>(200,"文件不完整",null);
         }
         //文件元信息存到数据库中
         File file = new File(completePath);
-        fileInfoService.insertFileInfo(new FileInfo(completePath,fileSize,file.lastModified(), fileChunkSha256Service.getFileChunkSha256(path).getBytes()));
+        fileInfoService.insertFileInfo(new FileInfo(completePath,fileSize,file.lastModified(), fileChunkSha256Service.getFileChunkSha256(completePath).getBytes()));
         fileCountService.addFileCount(uploadId);
         Map<String,String> filePathMap=new HashMap<>();
         filePathMap.put("filePath",path);
@@ -207,7 +247,8 @@ public class DirectoryHttpController {
     @PostMapping("/{uploadId}/complete")
     public BaseMessage<Map<String,String>> complete(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) {
         if(fileCountService.getFileCount(uploadId)!=Integer.parseInt(completeChunk.get("totalFiles"))){
-            return new BaseMessage<>(200,"未上传完全",null);
+            directoryInfoService.deleteDirectoryInfo(uploadId);
+            return new BaseMessage<>(500,"未上传完全",null);
         }
         fileCountService.deleteFileCount(uploadId);
         return new BaseMessage<>(200,"上传成功",null);

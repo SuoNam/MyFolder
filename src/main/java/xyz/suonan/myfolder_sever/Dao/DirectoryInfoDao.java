@@ -1,5 +1,6 @@
 package xyz.suonan.myfolder_sever.Dao;
 
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Select;
 import xyz.suonan.myfolder_sever.pojo.DirectoryInfo;
@@ -27,4 +28,9 @@ public interface DirectoryInfoDao {
             select directory_name from directory_info where id=#{uuid}
 """)
     List<String> selectNameByID(String uuid);
+
+    @Delete("""
+        delete from  directory_info where id=#{uuid}
+""")
+    int deleteByID(String uuid);
 }

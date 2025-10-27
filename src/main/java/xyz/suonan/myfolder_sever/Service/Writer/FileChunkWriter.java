@@ -23,7 +23,6 @@ public class FileChunkWriter implements ChunkWriteHanler {
 
         try (RandomAccessFile raf = new RandomAccessFile(file, "rw")) {
             raf.seek(fileWriteTask.getOffset());
-
             raf.write(fileWriteTask.getInputStream().readAllBytes());
             //TODO::改为动态分片大小
 

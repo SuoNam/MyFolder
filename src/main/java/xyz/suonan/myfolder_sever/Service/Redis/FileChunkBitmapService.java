@@ -90,6 +90,8 @@ public class FileChunkBitmapService {
         try{
             String safePath = URLEncoder.encode(path, StandardCharsets.UTF_8);
             String key="MyFolder:"+uploadId+":"+safePath;
+            System.out.println("key"+key);
+            System.out.println("chunkIndex"+chunkIndex);
             redis.opsForValue().setBit(key,chunkIndex,isComplete);
         }catch(Exception e){
             e.printStackTrace();

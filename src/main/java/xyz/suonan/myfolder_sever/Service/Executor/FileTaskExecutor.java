@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 @Service
 public class FileTaskExecutor {
@@ -12,6 +13,11 @@ public class FileTaskExecutor {
 
     public void submit(Runnable task) {
         executor.submit(task);
+    }
+
+    public int getThreadActiveCount(){
+        ThreadPoolExecutor  executorMinor= (ThreadPoolExecutor) executor;
+        return executorMinor.getActiveCount();
     }
 
     @PreDestroy

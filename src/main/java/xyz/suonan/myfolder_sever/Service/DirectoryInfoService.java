@@ -29,4 +29,8 @@ public class DirectoryInfoService {
     }
 
 
+    public boolean deleteDirectoryInfo(String uuid) {
+        return directoryInfoDao.deleteByID(uuid)!=0;
+    }
+
 }
