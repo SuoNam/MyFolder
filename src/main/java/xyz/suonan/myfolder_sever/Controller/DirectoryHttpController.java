@@ -236,7 +236,7 @@ public class DirectoryHttpController {
         }
         //文件元信息存到数据库中
         File file = new File(completePath);
-        fileInfoService.insertFileInfo(new FileInfo(completePath,fileSize,file.lastModified(), fileChunkSha256Service.getFileChunkSha256(completePath).getBytes()));
+        fileInfoService.insertFileInfo(new FileInfo(completePath,fileSize,file.lastModified(),HexFormat.of().parseHex(fileChunkSha256Service.getFileChunkSha256(completePath))));
         fileCountService.addFileCount(uploadId);
         Map<String,String> filePathMap=new HashMap<>();
         filePathMap.put("filePath",path);
