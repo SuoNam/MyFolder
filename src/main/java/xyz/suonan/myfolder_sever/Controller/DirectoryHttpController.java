@@ -147,7 +147,6 @@ public class DirectoryHttpController {
                 }catch (IOException e) {
                     //扫描directory_file 删除uploadId对应的项和其对应的文件
                     uploadRecoveryManager.Recover(uploadId);
-                    directoryInfoService.deleteDirectoryInfo(uploadId);
                     return new BaseMessage<>(500,"复制文件失败",null);
                     //throw new RuntimeException("复制文件失败: " + e.getMessage(), e);
                 }
@@ -256,7 +255,6 @@ public class DirectoryHttpController {
         if(!fileChunksCheck.check(absolutePath)){
             //扫描directory_file 删除uploadId对应的项和其对应的文件
             uploadRecoveryManager.Recover(uploadId);
-            directoryInfoService.deleteDirectoryInfo(uploadId);
             return new BaseMessage<>(200,"文件不完整",null);
         }
         //文件元信息存到数据库中 绝对路径
@@ -276,22 +274,23 @@ public class DirectoryHttpController {
         return new BaseMessage<>(200,"创建成功",map);
     }
     @PostMapping("/{uploadId}/complete")
-    public BaseMessage<Map<String,String>> complete(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws InterruptedException {
-        int redisFileCount=fileCountService.getFileCount(uploadId);
+    public BaseMessage<Map<String,String>> complete(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws InterruptedException, IOException {
+
         int fileCount=Integer.parseInt(completeChunk.get("totalFiles"));
 
         //查询当前的uploadId的文件状态数组 若都完成文件检验->放行  若未完成->阻塞等待
-        Map<String,Integer> filesStatusResult=folderFilesStatusService.getFileStatus(uploadId);
+
         int retry = 0, maxRetry = 5000;
-        while (!filesStatusResult.values().stream().allMatch(v->v==1)) {
+        while (!folderFilesStatusService.getFileStatus(uploadId).values().stream().allMatch(v->v==1)) {
             if (retry++ > maxRetry) {
                 return new BaseMessage<>(500, "等待超时，仍有文件未完成", null);
             }
             Thread.sleep(200);
         }
-
+        int redisFileCount=fileCountService.getFileCount(uploadId);
         if(fileCount!=redisFileCount){
-            directoryInfoService.deleteDirectoryInfo(uploadId);
+            //扫描directory_file 删除uploadId对应的项和其对应的文件
+            uploadRecoveryManager.Recover(uploadId);
             return new BaseMessage<>(500,"未上传完全",null);
         }
         fileCountService.deleteFileCount(uploadId);

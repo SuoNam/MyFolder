@@ -41,8 +41,9 @@ public class UploadRecoveryManager {
         String directoryName=directoryInfoService.getDirectoryNameById(uploadId);
         Path absolutePath= Paths.get(basePath,parentPath,directoryName);
         deleteDirectory(absolutePath);
-        directoryInfoService.deleteDirectoryInfo(uploadId);
         directoryFileService.deleteDirectoryFile(uploadId);
+        directoryInfoService.deleteDirectoryInfo(uploadId);
+
 
     }
 
