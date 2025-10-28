@@ -1,5 +1,4 @@
 package xyz.suonan.myfolder_sever.Service;
-import org.apache.ibatis.exceptions.PersistenceException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import xyz.suonan.myfolder_sever.Dao.DirectoryInfoDao;
@@ -29,8 +28,27 @@ public class DirectoryInfoService {
     }
 
 
-    public boolean deleteDirectoryInfo(String uuid) {
-        return directoryInfoDao.deleteByID(uuid)!=0;
+    public void deleteDirectoryInfo(String uuid) {
+        directoryInfoDao.deleteByID(uuid);
+    }
+
+    public String getParentNameById(String uuid){
+        List<String> parent_name_list=directoryInfoDao.selectParentPathById(uuid);
+
+        if(parent_name_list.isEmpty()){
+            return null;
+        }
+        return parent_name_list.get(0);
+    }
+
+    public String getDirectoryNameById(String uuid){
+        List<String> directory_name_list=directoryInfoDao.selectParentPathById(uuid);
+
+        if(directory_name_list.isEmpty()){
+            return null;
+        }
+        return directory_name_list.get(0);
+
     }
 
 }

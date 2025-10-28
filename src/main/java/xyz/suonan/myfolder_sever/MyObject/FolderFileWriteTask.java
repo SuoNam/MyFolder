@@ -10,7 +10,8 @@ import java.io.InputStream;
 @Data
 @AllArgsConstructor
 public class FolderFileWriteTask implements WriteTask {
-    private String path;
+    private String absolutePath;
+    private String relativePath;
     private String uploadId;
     private int chunkIndex;
     private int totalChunks;
@@ -25,6 +26,7 @@ public class FolderFileWriteTask implements WriteTask {
         }catch(Exception e){
             e.printStackTrace();
         }
-        bitmapService.setFileChunkBitmap(uploadId,path,chunkIndex,true);
+        bitmapService.setFileChunkBitmap(uploadId,relativePath,chunkIndex,true);
+
     }
 }

@@ -18,7 +18,7 @@ public class FileChunkWriter implements ChunkWriteHanler {
     FileChunkBitmapService fileChunkBitmapService;
     @Override
     public void doWrite(FolderFileWriteTask fileWriteTask){
-        File file=new File(String.valueOf(Paths.get(basePath,fileWriteTask.getPath())));
+        File file=new File(fileWriteTask.getAbsolutePath());
         file.getParentFile().mkdirs();
 
         try (RandomAccessFile raf = new RandomAccessFile(file, "rw")) {

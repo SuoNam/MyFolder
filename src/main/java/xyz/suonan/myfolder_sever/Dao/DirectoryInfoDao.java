@@ -25,7 +25,7 @@ public interface DirectoryInfoDao {
     List<String> selectAll(String uuid);
 
     @Select("""
-            select directory_name from directory_info where id=#{uuid}
+        select directory_name from directory_info where id=#{uuid}
 """)
     List<String> selectNameByID(String uuid);
 
@@ -33,4 +33,8 @@ public interface DirectoryInfoDao {
         delete from  directory_info where id=#{uuid}
 """)
     int deleteByID(String uuid);
+    @Select("""
+    select parent_path from directory_info where id=#{uuid}
+""")
+    List<String> selectParentPathById(String uuid);
 }
