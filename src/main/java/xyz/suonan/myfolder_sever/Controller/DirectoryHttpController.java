@@ -139,6 +139,8 @@ public class DirectoryHttpController {
                 //TODO::添加文件元信息到directory_file中
                 fileInfoUpload.setPath(String.valueOf(Paths.get(basePath,fileInfoUpload.getPath())));
                 fileInfoService.insertFileInfo(fileInfoUpload);
+                fileCountService.addFileCount(uploadId);
+
             }
             else{
                 fileInfoResponse.setExists(false);
@@ -191,11 +193,6 @@ public class DirectoryHttpController {
 
         String completePath=String.valueOf(Paths.get(basePath,path));
         Map<String,String> map=new HashMap<>();
-        log.info("/{uploadId}/chunks/complete");
-        log.info(path);
-        log.info(String.valueOf(totalChunks));
-        log.info(String.valueOf(fileSize));
-        log.info(completePath);
         //检测位点图是否完整
         //添加看是线程没写完导致的还是前端没有发过来
         Map<String,Object>bitmapCheckResult=fileChunkBitmapService.isComplete(uploadId,path,totalChunks);
