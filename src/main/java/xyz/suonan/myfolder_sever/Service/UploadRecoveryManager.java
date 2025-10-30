@@ -43,6 +43,7 @@ public class UploadRecoveryManager {
         deleteDirectory(absolutePath);
         directoryFileService.deleteDirectoryFile(uploadId);
         directoryInfoService.deleteDirectoryInfo(uploadId);
+        //TODO::加对filInfo的回滚
 
 
     }

@@ -163,6 +163,7 @@ public class DirectoryHttpController {
 
                     fileInfoUpload.setPath(absolutePath);
                     //添加文件元信息到file_info中 绝对路径
+
                     fileInfoService.insertFileInfo(fileInfoUpload);
                     //记录完成文件数+1
                     fileCountService.addFileCount(uploadId);

@@ -69,6 +69,7 @@ public class FileHttpController {
             File dest = new File(start.toFile().getAbsolutePath());
             try {
                 file.transferTo(dest); // 保存文件
+                //TODO::添加对file_info表的添加
                 fileBaseItemList.add(new BaseMessage<>(200, "上传成功", file.getOriginalFilename()));
             } catch (IOException e) {
                 //日志打印错误信息
@@ -98,6 +99,7 @@ public class FileHttpController {
             Path target = Paths.get(basePath, stringStringMap.get("newPath"));
             try {
                 Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+                //TODO::添加对file_info的修改
                 fileBaseItemList.add(new BaseMessage<>(200, "移动成功", stringStringMap.get("targetPath")));
             } catch (IOException e) {
                 log.error(e.getMessage());
@@ -112,6 +114,8 @@ public class FileHttpController {
         for (Map<String, String> stringStringMap : pathMap) {
             Path source = Paths.get(basePath, stringStringMap.get("deletePath"));
             try{
+                //TODO::修改为可删除文件夹
+                //TODO::添加对file_info的删除
                 Files.delete(source);
                 fileBaseItemList.add(new BaseMessage<>(200, "删除成功", stringStringMap.get("deletePath")));
             }catch (NoSuchFileException e) {
