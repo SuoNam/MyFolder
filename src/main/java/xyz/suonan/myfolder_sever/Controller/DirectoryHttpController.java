@@ -191,7 +191,6 @@ public class DirectoryHttpController {
 
         return new BaseMessage<>(200,"创建成功",data);
     }
-
     @PutMapping("/{uploadId}/chunks/{pageNumber}")
     public BaseMessage<Map<String,Map<String,String>>> uploadChunk(
             @PathVariable String uploadId,
@@ -221,7 +220,6 @@ public class DirectoryHttpController {
         map.put("data",sha26Map);
         return new BaseMessage<>(200,"创建成功",map);
     }
-
     @PostMapping("/{uploadId}/chunks/complete")
     public BaseMessage<Map<String,String>> completeChunk(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws IOException, InterruptedException {
         //相对路径
@@ -295,7 +293,7 @@ public class DirectoryHttpController {
         int fileCount=Integer.parseInt(completeChunk.get("totalFiles"));
 
         //查询当前的uploadId的文件状态数组 若都完成文件检验->放行  若未完成->阻塞等待
-
+        //TODO::出现卡死现象 问题尚未清楚
         int retry = 0, maxRetry = 5000;
         while (!folderFilesStatusService.getFileStatus(uploadId).values().stream().allMatch(v->v==1)) {
             if (retry++ > maxRetry) {
