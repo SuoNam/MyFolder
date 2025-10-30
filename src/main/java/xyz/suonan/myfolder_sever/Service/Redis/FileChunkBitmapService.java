@@ -1,9 +1,12 @@
 package xyz.suonan.myfolder_sever.Service.Redis;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import xyz.suonan.myfolder_sever.Controller.DirectoryHttpController;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -14,9 +17,10 @@ import java.util.stream.IntStream;
 @Service
 public class FileChunkBitmapService {
 
+    private static final Logger log = LoggerFactory.getLogger(FileChunkBitmapService.class);
+
     @Autowired
     private StringRedisTemplate redis;
-
     public boolean createFileChunkBitmap(String uploadId,String path,int totalChunks){
             try{
                 String safePath = URLEncoder.encode(path, StandardCharsets.UTF_8);
@@ -24,6 +28,8 @@ public class FileChunkBitmapService {
                 redis.opsForValue().setBit(key,totalChunks-1,false);
                 redis.expire(key, Duration.ofHours(24));
             }catch(Exception e){
+                log.error("path:"+path);
+                log.error(String.valueOf(totalChunks));
                 e.printStackTrace();
                 return false;
             }
@@ -60,7 +66,8 @@ public class FileChunkBitmapService {
         }
 
         //所有切片都完成
-        if(redis.execute((RedisCallback<Long>) connection->connection.bitCount(key.getBytes()))==totalChunks){
+        long redisChunks=redis.execute((RedisCallback<Long>) connection->connection.bitCount(key.getBytes()));
+        if(redisChunks==totalChunks){
             result.put("isComplete",true);
             result.put("missChunks", Collections.emptyList());
             return result;
@@ -90,10 +97,10 @@ public class FileChunkBitmapService {
         try{
             String safePath = URLEncoder.encode(path, StandardCharsets.UTF_8);
             String key="MyFolder:"+uploadId+":"+safePath;
-            System.out.println("key"+key);
-            System.out.println("chunkIndex"+chunkIndex);
             redis.opsForValue().setBit(key,chunkIndex,isComplete);
         }catch(Exception e){
+            log.error("path:"+path);
+            log.error(String.valueOf(chunkIndex));
             e.printStackTrace();
             return false;
         }

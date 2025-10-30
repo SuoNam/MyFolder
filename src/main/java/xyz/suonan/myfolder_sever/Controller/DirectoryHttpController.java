@@ -135,40 +135,55 @@ public class DirectoryHttpController {
 
             //添加文件元信息到directory_file中 相对路径
             directoryFileService.addDirectoryFile(uploadId,relativelyPath);
-            //判断文件是否存在
-            if(fileInfoService.sha256isExists(fileInfoUpload)){
-                fileInfoResponse.setExists(true);
-                //将目标文件复制到指定目录
-                Path sourceFile =Paths.get(fileInfoService.selectPathBySha256(fileInfoUpload).get(0));
-                Path targetFile=Paths.get(absolutePath);
-                try{
-                    Files.createDirectories(targetFile.getParent());
-                    Files.copy(sourceFile,targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                }catch (IOException e) {
-                    //扫描directory_file 删除uploadId对应的项和其对应的文件
-                    uploadRecoveryManager.Recover(uploadId);
-                    return new BaseMessage<>(500,"复制文件失败",null);
-                    //throw new RuntimeException("复制文件失败: " + e.getMessage(), e);
+
+
+            //判断文件是不是空文件
+            int totalChunks = fileInfoUpload.getTotalChunks();
+            if(totalChunks==0){
+                //处理空文件问题
+                Path path=Path.of(absolutePath);
+                Files.createDirectories(path.getParent());
+                Files.createFile(Path.of(absolutePath));
+            }else{
+                if(fileInfoService.sha256isExists(fileInfoUpload)){
+                    fileInfoResponse.setExists(true);
+                    //将目标文件复制到指定目录
+                    Path sourceFile =Paths.get(fileInfoService.selectPathBySha256(fileInfoUpload).get(0));
+                    Path targetFile=Paths.get(absolutePath);
+                    try{
+                        Files.createDirectories(targetFile.getParent());
+                        Files.copy(sourceFile,targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                    }catch (IOException e) {
+                        //扫描directory_file 删除uploadId对应的项和其对应的文件
+                        log.info("出现问题执行回滚");
+                        uploadRecoveryManager.Recover(uploadId);
+                        return new BaseMessage<>(500,"复制文件失败",null);
+                        //throw new RuntimeException("复制文件失败: " + e.getMessage(), e);
+                    }
+
+                    fileInfoUpload.setPath(absolutePath);
+                    //添加文件元信息到file_info中 绝对路径
+                    fileInfoService.insertFileInfo(fileInfoUpload);
+                    //记录完成文件数+1
+                    fileCountService.addFileCount(uploadId);
+
                 }
+                else{
+                    fileInfoResponse.setExists(false);
+                    //创建redis点位数组缓存  MyFolder:UploadId:X-File-Path 相对路径
 
-                fileInfoUpload.setPath(absolutePath);
-                //添加文件元信息到file_info中 绝对路径
-                fileInfoService.insertFileInfo(fileInfoUpload);
-                //记录完成文件数+1
-                fileCountService.addFileCount(uploadId);
+                    fileChunkBitmapService.createFileChunkBitmap(uploadId,relativelyPath,totalChunks);
+                    //存entries中的文件sha256到redis中 绝对路径
+                    String sha256Hex=HexFormat.of().formatHex(fileInfoUpload.getSha256());
+                    fileChunkSha256Service.setFileChunkSha256(absolutePath,sha256Hex);
+                    //建立Folder:uploadId   filename values的Hash表 存文件写入状态 相对路径
+                    folderFilesStatusService.createFileStatusBitmap(uploadId,relativelyPath);
 
+                }
             }
-            else{
-                fileInfoResponse.setExists(false);
-                //创建redis点位数组缓存  MyFolder:UploadId:X-File-Path 相对路径
-                fileChunkBitmapService.createFileChunkBitmap(uploadId,relativelyPath,fileInfoUpload.getTotalChunks());
-                //存entries中的文件sha256到redis中 绝对路径
-                String sha256Hex=HexFormat.of().formatHex(fileInfoUpload.getSha256());
-                fileChunkSha256Service.setFileChunkSha256(absolutePath,sha256Hex);
-                //建立Folder:uploadId   filename values的Hash表 存文件写入状态 相对路径
-                folderFilesStatusService.createFileStatusBitmap(uploadId,relativelyPath);
 
-            }
+            //判断文件是否存在
+
             data.add(fileInfoResponse);
 
         }
@@ -184,7 +199,6 @@ public class DirectoryHttpController {
         //创建写任务 X-File-Path X-Total-Parts pageNumber Content-Range Content-sha256 content
         byte[] chunkData = request.getInputStream().readAllBytes();
         int Offset= Integer.parseInt(request.getHeader("Content-Range").split("-")[0]);
-        System.out.println("Offset:"+Offset);
         int totalChunks=request.getIntHeader("X-Total-Parts");
         String chunkSha256=request.getHeader("Content-sha256");
         Map<String,String> sha26Map = new HashMap<>();
@@ -229,7 +243,8 @@ public class DirectoryHttpController {
             missChunksMap.put("missChunks",missChunks);
             String missChunksJson=objectMapper.writeValueAsString(missChunksMap);
             map.put("data",missChunksJson);
-            directoryInfoService.deleteDirectoryInfo(uploadId);
+            log.info("出现问题执行回滚");
+            uploadRecoveryManager.Recover(uploadId);
             return new BaseMessage<>(500,"切片不完整",map);
         }
 
@@ -283,16 +298,20 @@ public class DirectoryHttpController {
         int retry = 0, maxRetry = 5000;
         while (!folderFilesStatusService.getFileStatus(uploadId).values().stream().allMatch(v->v==1)) {
             if (retry++ > maxRetry) {
+                log.info("出现问题执行回滚");
+                uploadRecoveryManager.Recover(uploadId);
+
                 return new BaseMessage<>(500, "等待超时，仍有文件未完成", null);
             }
             Thread.sleep(200);
         }
-        int redisFileCount=fileCountService.getFileCount(uploadId);
-        if(fileCount!=redisFileCount){
-            //扫描directory_file 删除uploadId对应的项和其对应的文件
-            uploadRecoveryManager.Recover(uploadId);
-            return new BaseMessage<>(500,"未上传完全",null);
-        }
+
+//        int redisFileCount=fileCountService.getFileCount(uploadId);
+//        if(fileCount!=redisFileCount){
+//            //扫描directory_file 删除uploadId对应的项和其对应的文件
+//
+//            return new BaseMessage<>(500,"未上传完全",null);
+//        }
         fileCountService.deleteFileCount(uploadId);
         return new BaseMessage<>(200,"上传成功",null);
     }

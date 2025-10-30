@@ -21,8 +21,6 @@ public class FileChunksCheck implements ChunksCheck{
         String fileSha256=calculateSHA256(file);
         //从redis中找到对应path的sha256
         String targetSha256=fileChunkSha256Service.getFileChunkSha256(path);
-        System.out.println("fileSha256："+fileSha256);
-        System.out.println("targetSha256:"+targetSha256);
         return targetSha256.equals(fileSha256);
     }
 

@@ -18,7 +18,7 @@ public class FileCountService {
     public boolean addFileCount(String uploadId) {
         String oldValue=redis.opsForValue().get("MyFolder:"+uploadId+":"+"Count");
         if (oldValue != null) {
-            redis.opsForValue().set("MyFolder:"+uploadId+":"+"Count", String.valueOf(Integer.parseInt( oldValue)+1));
+            redis.opsForValue().set("MyFolder:"+uploadId+":"+"Count", String.valueOf(Integer.parseInt(oldValue)+1));
         }
         return true;
     }
