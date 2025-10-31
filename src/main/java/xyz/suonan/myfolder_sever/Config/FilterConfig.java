@@ -20,7 +20,7 @@ public class FilterConfig  {
     public FilterRegistrationBean<TokenFilter> tokenFilterRegistration(TokenFilter tokenFilter) {
         FilterRegistrationBean<TokenFilter> registrationBean = new FilterRegistrationBean<>();
         registrationBean.setFilter(tokenFilter);
-        registrationBean.addUrlPatterns("/file/uploadfile","/file/createfolder","/file/rename","");
+        registrationBean.addUrlPatterns("/file/uploadfile","/file/createfolder","/file/rename","/directory/*");
         registrationBean.setOrder(2);
         return registrationBean;
     }
