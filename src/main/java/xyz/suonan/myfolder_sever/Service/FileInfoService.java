@@ -24,5 +24,7 @@ public class FileInfoService{
     public List<String> selectPathBySha256(FileInfo file){
         return fileInfoDao.select(file.getSha256());
     }
-
+    public void deleteFileByPath(String path){
+        fileInfoDao.deleteByPath(path);
+    }
 }

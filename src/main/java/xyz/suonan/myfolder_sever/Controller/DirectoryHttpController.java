@@ -20,10 +20,7 @@ import xyz.suonan.myfolder_sever.MyObject.FolderFileWriteTask;
 import xyz.suonan.myfolder_sever.Service.*;
 import xyz.suonan.myfolder_sever.Service.Checker.FileChunksCheck;
 import xyz.suonan.myfolder_sever.Service.Executor.FileTaskExecutor;
-import xyz.suonan.myfolder_sever.Service.Redis.FileChunkBitmapService;
-import xyz.suonan.myfolder_sever.Service.Redis.FileChunkSha256Service;
-import xyz.suonan.myfolder_sever.Service.Redis.FileCountService;
-import xyz.suonan.myfolder_sever.Service.Redis.FolderFilesStatusService;
+import xyz.suonan.myfolder_sever.Service.Redis.*;
 import xyz.suonan.myfolder_sever.Service.Writer.FileChunkWriter;
 import xyz.suonan.myfolder_sever.Utils.FileZipService;
 import xyz.suonan.myfolder_sever.Utils.IdGen;
@@ -56,7 +53,7 @@ public class DirectoryHttpController {
     private final FileZipService fileZipService;
     private final DirectoryInfoService directoryInfoService;
     private final FileInfoService fileInfoService;
-    private final DirectoryFileService directoryFileService;
+    private final FolderFileAbsoluteService folderFileAbsoluteService;
     private final FileChunkBitmapService fileChunkBitmapService;
     private final FileChunkSha256Service fileChunkSha256Service;
     private final FileChunkWriter fileChunkWriter;
@@ -64,7 +61,6 @@ public class DirectoryHttpController {
 
 
     private final FileTaskExecutor fileTaskExecutor;
-    private final FileCountService fileCountService;
     private final FolderFilesStatusService folderFilesStatusService;
 
     private final UploadRecoveryManager uploadRecoveryManager;
@@ -108,7 +104,7 @@ public class DirectoryHttpController {
             return new BaseMessage<>(500,"创建失败", ErrorType.resolve(code,"sql"));
         }
         String uploadId=directoryInfo.getId();
-        fileCountService.createFileCount(uploadId);
+//        fileCountService.createFileCount(uploadId);
         Map<String,String> map = new HashMap<>();
         map.put("uploadId",uploadId);
         map.put("maxConcurrency","3");
@@ -130,13 +126,12 @@ public class DirectoryHttpController {
 
             String absolutePath = String.valueOf(Paths.get(basePath,parentName,fileInfoUpload.getPath()));
             String relativelyPath=fileInfoUpload.getPath();
+            //存上传文件夹 相对路径 绝对路径
+            folderFileAbsoluteService.createFolderFileAbsolute(uploadId,relativelyPath,absolutePath);
 
             FileInfoResponse fileInfoResponse = new FileInfoResponse(fileInfoUpload.getPath(),fileInfoUpload.getSha256());
-
             //添加文件元信息到directory_file中 相对路径
-            directoryFileService.addDirectoryFile(uploadId,relativelyPath);
-
-
+            //directoryFileService.addDirectoryFile(uploadId,relativelyPath);
             //判断文件是不是空文件
             int totalChunks = fileInfoUpload.getTotalChunks();
             if(totalChunks==0){
@@ -144,6 +139,10 @@ public class DirectoryHttpController {
                 Path path=Path.of(absolutePath);
                 Files.createDirectories(path.getParent());
                 Files.createFile(Path.of(absolutePath));
+                fileInfoResponse.setExists(true);
+                fileInfoUpload.setPath(absolutePath);
+                //添加文件元信息到file_info中 绝对路径
+                fileInfoService.insertFileInfo(fileInfoUpload);
             }else{
                 if(fileInfoService.sha256isExists(fileInfoUpload)){
                     fileInfoResponse.setExists(true);
@@ -160,19 +159,15 @@ public class DirectoryHttpController {
                         return new BaseMessage<>(500,"复制文件失败",null);
                         //throw new RuntimeException("复制文件失败: " + e.getMessage(), e);
                     }
-
                     fileInfoUpload.setPath(absolutePath);
                     //添加文件元信息到file_info中 绝对路径
-
                     fileInfoService.insertFileInfo(fileInfoUpload);
                     //记录完成文件数+1
-                    fileCountService.addFileCount(uploadId);
-
+                    //fileCountService.addFileCount(uploadId);
                 }
                 else{
                     fileInfoResponse.setExists(false);
                     //创建redis点位数组缓存  MyFolder:UploadId:X-File-Path 相对路径
-
                     fileChunkBitmapService.createFileChunkBitmap(uploadId,relativelyPath,totalChunks);
                     //存entries中的文件sha256到redis中 绝对路径
                     String sha256Hex=HexFormat.of().formatHex(fileInfoUpload.getSha256());
@@ -182,9 +177,6 @@ public class DirectoryHttpController {
 
                 }
             }
-
-            //判断文件是否存在
-
             data.add(fileInfoResponse);
 
         }
@@ -279,7 +271,7 @@ public class DirectoryHttpController {
         //添加文件元信息到file_info中 绝对路径
         fileInfoService.insertFileInfo(new FileInfo(absolutePath,fileSize,file.lastModified(),HexFormat.of().parseHex(fileChunkSha256Service.getFileChunkSha256(absolutePath))));
 
-        fileCountService.addFileCount(uploadId);
+//        fileCountService.addFileCount(uploadId);
 
         Map<String,String> filePathMap=new HashMap<>();
         filePathMap.put("filePath",relativePath);
@@ -311,7 +303,7 @@ public class DirectoryHttpController {
 //
 //            return new BaseMessage<>(500,"未上传完全",null);
 //        }
-        fileCountService.deleteFileCount(uploadId);
+//        fileCountService.deleteFileCount(uploadId);
         return new BaseMessage<>(200,"上传成功",null);
     }
 
