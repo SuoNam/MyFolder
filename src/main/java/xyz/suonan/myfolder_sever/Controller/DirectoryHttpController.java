@@ -21,6 +21,8 @@ import xyz.suonan.myfolder_sever.Service.*;
 import xyz.suonan.myfolder_sever.Service.Checker.FileChunksCheck;
 import xyz.suonan.myfolder_sever.Service.Executor.FileTaskExecutor;
 import xyz.suonan.myfolder_sever.Service.Redis.*;
+import xyz.suonan.myfolder_sever.Service.Timer.PartTimer;
+import xyz.suonan.myfolder_sever.Service.Timer.TotalTimer;
 import xyz.suonan.myfolder_sever.Service.Writer.FileChunkWriter;
 import xyz.suonan.myfolder_sever.Utils.FileZipService;
 import xyz.suonan.myfolder_sever.Utils.IdGen;
@@ -49,6 +51,9 @@ public class DirectoryHttpController {
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition condition = lock.newCondition();
 
+
+    private final PartTimer partTimer;
+    private final TotalTimer totalTimer;
 
     private final FileZipService fileZipService;
     private final DirectoryInfoService directoryInfoService;
@@ -96,6 +101,9 @@ public class DirectoryHttpController {
     }
     @PostMapping("/directoryInfo")
     public BaseMessage<Object> upLoadDirectory(@RequestBody DirectoryInfo directoryInfo) {
+        totalTimer.begin();
+        partTimer.name="/directoryInfo";
+        partTimer.begin();
         directoryInfo.setId(IdGen.generateId());
         directoryInfo.setCreationDate(new Date());
 
@@ -109,11 +117,14 @@ public class DirectoryHttpController {
         map.put("uploadId",uploadId);
         map.put("maxConcurrency","3");
         map.put("dedup","true");
+        partTimer.close();
         return new BaseMessage<>(200,"创建成功",map);
     }
     @PostMapping("/filesInfo")
     public BaseMessage<List<FileInfoResponse>> filesInfo(@RequestParam  String uploadId,
                                                      @RequestBody Map<String, List<FileInfoUpload>> filesInfo) throws IOException {
+        partTimer.name="/filesInfo";
+        partTimer.begin();
         if(!directoryInfoService.UuidIsExist(uploadId)){
             return new BaseMessage<>(200,"uuid不存在",null);
         }
@@ -180,7 +191,7 @@ public class DirectoryHttpController {
             data.add(fileInfoResponse);
 
         }
-
+        partTimer.close();
         return new BaseMessage<>(200,"创建成功",data);
     }
     @PutMapping("/{uploadId}/chunks/{pageNumber}")
@@ -188,6 +199,8 @@ public class DirectoryHttpController {
             @PathVariable String uploadId,
             @PathVariable int pageNumber,
             HttpServletRequest request) throws IOException {
+        partTimer.name="/"+uploadId+"/chunks/"+pageNumber;
+        partTimer.begin();
         //创建写任务 X-File-Path X-Total-Parts pageNumber Content-Range Content-sha256 content
         byte[] chunkData = request.getInputStream().readAllBytes();
         int Offset= Integer.parseInt(request.getHeader("Content-Range").split("-")[0]);
@@ -210,10 +223,13 @@ public class DirectoryHttpController {
 
         Map<String,Map<String,String>> map = new HashMap<>();
         map.put("data",sha26Map);
+        partTimer.close();
         return new BaseMessage<>(200,"创建成功",map);
     }
     @PostMapping("/{uploadId}/chunks/complete")
     public BaseMessage<Map<String,String>> completeChunk(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws IOException, InterruptedException {
+        partTimer.name="/"+uploadId+"/chunks/complete";
+        partTimer.begin();
         //相对路径
         String relativePath=completeChunk.get("filePath");
         int totalChunks=Integer.parseInt(completeChunk.get("totalParts"));
@@ -277,10 +293,13 @@ public class DirectoryHttpController {
         filePathMap.put("filePath",relativePath);
         String filePath=objectMapper.writeValueAsString(filePathMap);
         map.put("data",filePath);
+        partTimer.close();
         return new BaseMessage<>(200,"创建成功",map);
     }
     @PostMapping("/{uploadId}/complete")
     public BaseMessage<Map<String,String>> complete(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws InterruptedException, IOException {
+        partTimer.name="/"+uploadId+"/complete";
+        partTimer.begin();
 
         int fileCount=Integer.parseInt(completeChunk.get("totalFiles"));
 
@@ -304,6 +323,8 @@ public class DirectoryHttpController {
 //            return new BaseMessage<>(500,"未上传完全",null);
 //        }
 //        fileCountService.deleteFileCount(uploadId);
+        partTimer.close();
+        totalTimer.close();
         return new BaseMessage<>(200,"上传成功",null);
     }
 
