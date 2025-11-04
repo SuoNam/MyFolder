@@ -112,6 +112,7 @@ public class DirectoryHttpController {
             return new BaseMessage<>(500,"创建失败", ErrorType.resolve(code,"sql"));
         }
         String uploadId=directoryInfo.getId();
+        //TODO::添加一个uploadId有效期
 //        fileCountService.createFileCount(uploadId);
         Map<String,String> map = new HashMap<>();
         map.put("uploadId",uploadId);
@@ -125,6 +126,7 @@ public class DirectoryHttpController {
                                                      @RequestBody Map<String, List<FileInfoUpload>> filesInfo) throws IOException {
         partTimer.name="/filesInfo";
         partTimer.begin();
+        //TODO::添加一个验证uploadId
         if(!directoryInfoService.UuidIsExist(uploadId)){
             return new BaseMessage<>(200,"uuid不存在",null);
         }
@@ -155,6 +157,8 @@ public class DirectoryHttpController {
                 //添加文件元信息到file_info中 绝对路径
                 fileInfoService.insertFileInfo(fileInfoUpload);
             }else{
+
+                //TODO::添加文件大小控制||对短期的重复上传没有文件大小限制
                 if(fileInfoService.sha256isExists(fileInfoUpload)){
                     fileInfoResponse.setExists(true);
                     //将目标文件复制到指定目录
@@ -165,6 +169,7 @@ public class DirectoryHttpController {
                         Files.copy(sourceFile,targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
                     }catch (IOException e) {
                         //扫描directory_file 删除uploadId对应的项和其对应的文件
+                        //TODO::验证uploadId过期后回滚
                         log.info("出现问题执行回滚");
                         uploadRecoveryManager.Recover(uploadId);
                         return new BaseMessage<>(500,"复制文件失败",null);
@@ -199,6 +204,7 @@ public class DirectoryHttpController {
             @PathVariable String uploadId,
             @PathVariable int pageNumber,
             HttpServletRequest request) throws IOException {
+        //TODO::添加一个验证uploadId
         partTimer.name="/"+uploadId+"/chunks/"+pageNumber;
         partTimer.begin();
         //创建写任务 X-File-Path X-Total-Parts pageNumber Content-Range Content-sha256 content
@@ -228,6 +234,7 @@ public class DirectoryHttpController {
     }
     @PostMapping("/{uploadId}/chunks/complete")
     public BaseMessage<Map<String,String>> completeChunk(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws IOException, InterruptedException {
+        //TODO::添加一个验证uploadId
         partTimer.name="/"+uploadId+"/chunks/complete";
         partTimer.begin();
         //相对路径
@@ -241,33 +248,38 @@ public class DirectoryHttpController {
         Map<String,String> map=new HashMap<>();
         //检测位点图是否完整
         //添加看是线程没写完导致的还是前端没有发过来 相对路径
-        Map<String,Object>bitmapCheckResult=fileChunkBitmapService.isComplete(uploadId,relativePath,totalChunks);
-        if(Boolean.FALSE.equals(bitmapCheckResult.get("isComplete"))&&fileTaskExecutor.getThreadActiveCount()==0){
-            //获取哪些切片缺少
-            List<Integer> missChunks= (List<Integer>) bitmapCheckResult.get("missChunks");
-            //返回前端
-            Map<String,List<Integer>> missChunksMap = new HashMap<>();
-            missChunksMap.put("missChunks",missChunks);
-            String missChunksJson=objectMapper.writeValueAsString(missChunksMap);
-            map.put("data",missChunksJson);
-            log.info("出现问题执行回滚");
-            uploadRecoveryManager.Recover(uploadId);
-            return new BaseMessage<>(500,"切片不完整",map);
-        }
-
-        //等待所有线程写完或者位图已满 相对路径
         lock.lock();
         try {
+            int retry = 0;
+            int maxRetry = 1000; // 1000*100ms = 100s 超时控制
+
             while (true) {
-                boolean isComplete = (Boolean) fileChunkBitmapService
-                        .isComplete(uploadId, relativePath, totalChunks)
-                        .get("isComplete");
+                Map<String, Object> bitmapCheckResult = fileChunkBitmapService.isComplete(uploadId, relativePath, totalChunks);
+                boolean isComplete = (Boolean) bitmapCheckResult.get("isComplete");
                 int activeCount = fileTaskExecutor.getThreadActiveCount();
 
-                if (isComplete && activeCount == 0) break;
+                // 条件：所有线程结束 且 位图完整 -> 成功退出
+                if (isComplete && activeCount == 0) {
+                    break;
+                }
 
+                // 条件：线程都结束了 但 位图仍不完整 -> 真正的失败（回滚）
+                if (!isComplete && activeCount == 0) {
+                    //TODO::验证uploadId过期后回滚
+                    log.warn("检测到位图不完整，执行回滚 uploadId=" + uploadId);
+                    List<Integer> missChunks = (List<Integer>) bitmapCheckResult.get("missChunks");
+                    Map<String, List<Integer>> missChunksMap = Map.of("missChunks", missChunks);
+                    map.put("data", objectMapper.writeValueAsString(missChunksMap));
+                    uploadRecoveryManager.Recover(uploadId);
+                    return new BaseMessage<>(500, "切片不完整", map);
+                }
+
+                if (retry++ > maxRetry) {
+                    return new BaseMessage<>(500, "等待超时，仍有文件未完成", null);
+                }
                 condition.await(100, TimeUnit.MILLISECONDS);
             }
+
         } finally {
             lock.unlock();
         }
@@ -298,6 +310,7 @@ public class DirectoryHttpController {
     }
     @PostMapping("/{uploadId}/complete")
     public BaseMessage<Map<String,String>> complete(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws InterruptedException, IOException {
+        //TODO::添加一个验证uploadId
         partTimer.name="/"+uploadId+"/complete";
         partTimer.begin();
 
@@ -308,6 +321,7 @@ public class DirectoryHttpController {
         int retry = 0, maxRetry = 5000;
         while (!folderFilesStatusService.getFileStatus(uploadId).values().stream().allMatch(v->v==1)) {
             if (retry++ > maxRetry) {
+                //TODO::验证uploadId过期后回滚
                 log.info("出现问题执行回滚");
                 uploadRecoveryManager.Recover(uploadId);
 

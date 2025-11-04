@@ -22,7 +22,6 @@ public class TotalTimer implements Timer {
     @Override
     public void close() {
         long endTime = System.currentTimeMillis();
-
         long duration = endTime - startTime;
         List<Map<String,Long>> list=partTimer.getPartList();
         Time time= new Time(list,duration);
