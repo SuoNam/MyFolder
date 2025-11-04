@@ -1,3 +1,0 @@
-set(__QT_DEPLOY_TARGET_appMyTest_FILE G:/vs/qt/exercise file/MyTest/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/appMyTest.exe)
-set(__QT_DEPLOY_TARGET_appMyTest_TYPE EXECUTABLE)
-set(__QT_DEPLOY_TARGET_appMyTest_RUNTIME_DLLS G:/Qt/6.9.1/mingw_64/bin/Qt6QuickControls2.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6QuickTemplates2.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6Quick.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6QmlMeta.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6QmlWorkerScript.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6OpenGL.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6Gui.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6QmlModels.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6Qml.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6Network.dll;G:/Qt/6.9.1/mingw_64/bin/Qt6Core.dll)

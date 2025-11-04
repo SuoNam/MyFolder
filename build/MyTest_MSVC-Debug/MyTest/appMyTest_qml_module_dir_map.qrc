@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt/qml/MyTest">G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/MyTest</file>
+
+  </qresource>
+</RCC>

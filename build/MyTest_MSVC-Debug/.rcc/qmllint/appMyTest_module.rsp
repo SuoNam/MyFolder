@@ -1,0 +1,10 @@
+-I
+G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug
+-I
+G:/Qt/6.9.3/msvc2022_64/qml
+--resource
+G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/.qt/rcc/qmake_MyTest.qrc
+--resource
+G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/.qt/rcc/appMyTest_raw_qml_0.qrc
+--module
+MyTest

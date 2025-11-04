@@ -1,0 +1,24 @@
+^G:\VS\QT\EXERCISE FILE\MYTEST\BUILD\MYTEST_MSVC-DEBUG\CMAKEFILES\BC719402AA4BE1845525D2230EB0A1E7\APPMYTEST_AUTOGEN.RULE
+setlocal
+cd "G:\vs\qt\exercise file\MyTest\build\MyTest_MSVC-Debug"
+if %errorlevel% neq 0 goto :cmEnd
+G:
+if %errorlevel% neq 0 goto :cmEnd
+G:\Qt\Tools\CMake_64\bin\cmake.exe -E cmake_autogen "G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/CMakeFiles/appMyTest_autogen.dir/AutogenInfo.json" Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^G:\VS\QT\EXERCISE FILE\MYTEST\CMAKELISTS.TXT
+setlocal
+G:\Qt\Tools\CMake_64\bin\cmake.exe "-SG:/vs/qt/exercise file/MyTest" "-BG:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug" --check-stamp-file "G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

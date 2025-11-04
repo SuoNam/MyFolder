@@ -1,0 +1,14 @@
+-rootPath
+G:/vs/qt/exercise file/MyTest
+-cmake-output
+-output-file
+G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/.qt/qml_imports/appMyTest_build.cmake
+-importPath
+G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/MyTest
+-importPath
+G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug
+-importPath
+G:/Qt/6.9.3/msvc2022_64/qml
+-qrcFiles
+G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/.qt/rcc/qmake_MyTest.qrc
+G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/.qt/rcc/appMyTest_raw_qml_0.qrc
