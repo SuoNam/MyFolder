@@ -1,0 +1,180 @@
+[
+    {
+        "moduleFiles": [
+            {
+                "entries": [
+                    {
+                        "codegenSuccessful": false,
+                        "column": 20,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find signal \"clicked\".",
+                        "functionName": "onClicked",
+                        "line": 12
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 20,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find signal \"clicked\".",
+                        "functionName": "onClicked",
+                        "line": 19
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 20,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find signal \"clicked\".",
+                        "functionName": "onClicked",
+                        "line": 19
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 19,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find signal \"clicked\".",
+                        "functionName": "onClicked",
+                        "line": 25
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 19,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find signal \"clicked\".",
+                        "functionName": "onClicked",
+                        "line": 25
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 22,
+                        "durationMicroseconds": 271,
+                        "errorMessage": "",
+                        "functionName": "nameFilters",
+                        "line": 33
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 21,
+                        "durationMicroseconds": 90,
+                        "errorMessage": "Cannot find name currentSource",
+                        "functionName": "onAccepted",
+                        "line": 34
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 25,
+                        "durationMicroseconds": 43,
+                        "errorMessage": "Cannot access value for name currentSource",
+                        "functionName": "source",
+                        "line": 47
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 26,
+                        "durationMicroseconds": 139,
+                        "errorMessage": "",
+                        "functionName": "fillMode",
+                        "line": 49
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 23,
+                        "durationMicroseconds": 122,
+                        "errorMessage": "",
+                        "functionName": "scale",
+                        "line": 51
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 19,
+                        "durationMicroseconds": 99,
+                        "errorMessage": "",
+                        "functionName": "x",
+                        "line": 52
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 19,
+                        "durationMicroseconds": 95,
+                        "errorMessage": "",
+                        "functionName": "y",
+                        "line": 53
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 34,
+                        "durationMicroseconds": 74,
+                        "errorMessage": "",
+                        "functionName": "centerIn",
+                        "line": 48
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 40,
+                        "durationMicroseconds": 323,
+                        "errorMessage": "",
+                        "functionName": "lastPos",
+                        "line": 62
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 27,
+                        "durationMicroseconds": 332,
+                        "errorMessage": "",
+                        "functionName": "onPressed",
+                        "line": 65
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 27,
+                        "durationMicroseconds": 71,
+                        "errorMessage": "",
+                        "functionName": "onPressed",
+                        "line": 65
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 35,
+                        "durationMicroseconds": 1233,
+                        "errorMessage": "",
+                        "functionName": "onPositionChanged",
+                        "line": 67
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 35,
+                        "durationMicroseconds": 73,
+                        "errorMessage": "",
+                        "functionName": "onPositionChanged",
+                        "line": 67
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 25,
+                        "durationMicroseconds": 1687,
+                        "errorMessage": "",
+                        "functionName": "onWheel",
+                        "line": 75
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 25,
+                        "durationMicroseconds": 78,
+                        "errorMessage": "",
+                        "functionName": "onWheel",
+                        "line": 75
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 30,
+                        "durationMicroseconds": 90,
+                        "errorMessage": "",
+                        "functionName": "fill",
+                        "line": 58
+                    }
+                ],
+                "filePath": "/home/suo/Qt_project/ MyFolder/MyFolder/test.qml"
+            }
+        ],
+        "moduleId": "MyTest(appMyTest)"
+    }
+]

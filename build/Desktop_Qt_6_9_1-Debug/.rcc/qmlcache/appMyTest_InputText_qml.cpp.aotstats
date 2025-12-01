@@ -1,0 +1,124 @@
+[
+    {
+        "moduleFiles": [
+            {
+                "entries": [
+                    {
+                        "codegenSuccessful": true,
+                        "column": 11,
+                        "durationMicroseconds": 238,
+                        "errorMessage": "",
+                        "functionName": "width",
+                        "line": 19
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 13,
+                        "durationMicroseconds": 113,
+                        "errorMessage": "",
+                        "functionName": "height",
+                        "line": 20
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 23,
+                        "durationMicroseconds": 91,
+                        "errorMessage": "",
+                        "functionName": "fill",
+                        "line": 26
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 30,
+                        "durationMicroseconds": 53,
+                        "errorMessage": "Cannot access value for name leadingIcon",
+                        "functionName": "sourceComponent",
+                        "line": 32
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 22,
+                        "durationMicroseconds": 47,
+                        "errorMessage": "Cannot access value for name leadingIcon",
+                        "functionName": "visible",
+                        "line": 33
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 36,
+                        "durationMicroseconds": 218,
+                        "errorMessage": "",
+                        "functionName": "preferredWidth",
+                        "line": 30
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 36,
+                        "durationMicroseconds": 180,
+                        "errorMessage": "",
+                        "functionName": "preferredHeight",
+                        "line": 31
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 31,
+                        "durationMicroseconds": 188,
+                        "errorMessage": "",
+                        "functionName": "alignment",
+                        "line": 34
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 32,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find property \"verticalAlignment\".",
+                        "functionName": "verticalAlignment",
+                        "line": 43
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 31,
+                        "durationMicroseconds": 113,
+                        "errorMessage": "",
+                        "functionName": "alignment",
+                        "line": 41
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 29,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find property \"pixelSize\".",
+                        "functionName": "pixelSize",
+                        "line": 42
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 24,
+                        "durationMicroseconds": 41,
+                        "errorMessage": "Cannot access value for name inputText",
+                        "functionName": "color",
+                        "line": 46
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 25,
+                        "durationMicroseconds": 28,
+                        "errorMessage": "Cannot access value for name inputText",
+                        "functionName": "radius",
+                        "line": 47
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 31,
+                        "durationMicroseconds": 14,
+                        "errorMessage": "Cannot access value for name parent",
+                        "functionName": "fill",
+                        "line": 45
+                    }
+                ],
+                "filePath": "/home/suo/Qt_project/ MyFolder/MyFolder/InputText.qml"
+            }
+        ],
+        "moduleId": "MyTest(appMyTest)"
+    }
+]

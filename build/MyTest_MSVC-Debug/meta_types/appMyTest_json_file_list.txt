@@ -1,1 +1,0 @@
-G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/appMyTest_autogen/include_Debug/EWIEGA46WW/moc_ocr.cpp.json

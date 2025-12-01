@@ -1,6 +1,0 @@
-<RCC>
-  <qresource prefix="/qt/qml/MyTest">
-    <file alias="qmldir">G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/MyTest/qmldir</file>
-  </qresource>
-</RCC>
-

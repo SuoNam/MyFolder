@@ -1,0 +1,14 @@
+-rootPath
+/home/suo/Qt_project/ MyFolder/MyFolder
+-cmake-output
+-output-file
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/.qt/qml_imports/appMyTest_build.cmake
+-importPath
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/MyTest
+-importPath
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug
+-importPath
+/home/suo/Qt/6.9.1/gcc_64/qml
+-qrcFiles
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/.qt/rcc/qmake_MyTest.qrc
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/.qt/rcc/appMyTest_raw_qml_0.qrc

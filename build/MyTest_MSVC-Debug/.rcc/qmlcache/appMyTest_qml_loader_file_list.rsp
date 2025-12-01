@@ -1,9 +1,0 @@
---resource
-G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/.qt/rcc/qmake_MyTest.qrc
---resource
-G:/vs/qt/exercise file/MyTest/build/MyTest_MSVC-Debug/.qt/rcc/appMyTest_raw_qml_0.qrc
-/qt/qml/MyTest/Main.qml
-/qt/qml/MyTest/InputText.qml
-/qt/qml/MyTest/MyButton.qml
-/qt/qml/MyTest/test.qml
-/qt/qml/MyTest/mainWindow.qml

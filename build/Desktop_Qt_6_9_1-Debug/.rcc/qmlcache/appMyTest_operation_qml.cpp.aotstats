@@ -1,0 +1,332 @@
+[
+    {
+        "moduleFiles": [
+            {
+                "entries": [
+                    {
+                        "codegenSuccessful": false,
+                        "column": 26,
+                        "durationMicroseconds": 80,
+                        "errorMessage": "Cannot generate efficient code for storing an array in a non-sequence type",
+                        "functionName": "lsList",
+                        "line": 7
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 29,
+                        "durationMicroseconds": 31,
+                        "errorMessage": "Cannot generate efficient code for storing an array in a non-sequence type",
+                        "functionName": "stringlist",
+                        "line": 8
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 5,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Functions without type annotations won't be compiled",
+                        "functionName": "add",
+                        "line": 45
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 19,
+                        "durationMicroseconds": 46,
+                        "errorMessage": "",
+                        "functionName": "fill",
+                        "line": 4
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 26,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find property \"standardButtons\".",
+                        "functionName": "standardButtons",
+                        "line": 17
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 21,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find signal \"accepted\".",
+                        "functionName": "onAccepted",
+                        "line": 34
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 34,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find property \"placeholderText\".",
+                        "functionName": "placeholderText",
+                        "line": 27
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 23,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find property \"text\".",
+                        "functionName": "text",
+                        "line": 28
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 32,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find signal \"textChanged\".",
+                        "functionName": "onTextChanged",
+                        "line": 29
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 21,
+                        "durationMicroseconds": 66,
+                        "errorMessage": "",
+                        "functionName": "top",
+                        "line": 59
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 24,
+                        "durationMicroseconds": 48,
+                        "errorMessage": "",
+                        "functionName": "bottom",
+                        "line": 60
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 22,
+                        "durationMicroseconds": 46,
+                        "errorMessage": "",
+                        "functionName": "left",
+                        "line": 61
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 23,
+                        "durationMicroseconds": 45,
+                        "errorMessage": "",
+                        "functionName": "right",
+                        "line": 62
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 19,
+                        "durationMicroseconds": 74,
+                        "errorMessage": "",
+                        "functionName": "width",
+                        "line": 65
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 20,
+                        "durationMicroseconds": 60,
+                        "errorMessage": "",
+                        "functionName": "height",
+                        "line": 66
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 27,
+                        "durationMicroseconds": 38,
+                        "errorMessage": "",
+                        "functionName": "model",
+                        "line": 69
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 34,
+                        "durationMicroseconds": 43,
+                        "errorMessage": "",
+                        "functionName": "orientation",
+                        "line": 71
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 34,
+                        "durationMicroseconds": 24,
+                        "errorMessage": "",
+                        "functionName": "fill",
+                        "line": 68
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 32,
+                        "durationMicroseconds": 33,
+                        "errorMessage": "",
+                        "functionName": "height",
+                        "line": 75
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 48,
+                        "durationMicroseconds": 46,
+                        "errorMessage": "",
+                        "functionName": "verticalCenter",
+                        "line": 76
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 40,
+                        "durationMicroseconds": 94,
+                        "errorMessage": "Cannot access value for name name",
+                        "functionName": "buttontext",
+                        "line": 83
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 43,
+                        "durationMicroseconds": 321,
+                        "errorMessage": "Cannot access value for name name",
+                        "functionName": "onClickedFunc",
+                        "line": 84
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 43,
+                        "durationMicroseconds": 47,
+                        "errorMessage": "Cannot generate efficient code for LoadClosure",
+                        "functionName": "onClickedFunc",
+                        "line": 84
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 19,
+                        "durationMicroseconds": 39,
+                        "errorMessage": "",
+                        "functionName": "width",
+                        "line": 93
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 20,
+                        "durationMicroseconds": 60,
+                        "errorMessage": "",
+                        "functionName": "height",
+                        "line": 94
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 24,
+                        "durationMicroseconds": 15,
+                        "errorMessage": "Cannot access value for name lsList",
+                        "functionName": "model",
+                        "line": 97
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 31,
+                        "durationMicroseconds": 25,
+                        "errorMessage": "",
+                        "functionName": "fill",
+                        "line": 96
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 28,
+                        "durationMicroseconds": 33,
+                        "errorMessage": "",
+                        "functionName": "width",
+                        "line": 100
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 32,
+                        "durationMicroseconds": 32,
+                        "errorMessage": "",
+                        "functionName": "width",
+                        "line": 105
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 38,
+                        "durationMicroseconds": 46,
+                        "errorMessage": "",
+                        "functionName": "top",
+                        "line": 104
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 39,
+                        "durationMicroseconds": 24,
+                        "errorMessage": "",
+                        "functionName": "fill",
+                        "line": 111
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 53,
+                        "durationMicroseconds": 47,
+                        "errorMessage": "",
+                        "functionName": "verticalCenter",
+                        "line": 120
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 37,
+                        "durationMicroseconds": 63,
+                        "errorMessage": "",
+                        "functionName": "height",
+                        "line": 124
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 36,
+                        "durationMicroseconds": 59,
+                        "errorMessage": "",
+                        "functionName": "width",
+                        "line": 125
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 53,
+                        "durationMicroseconds": 46,
+                        "errorMessage": "",
+                        "functionName": "verticalCenter",
+                        "line": 126
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 43,
+                        "durationMicroseconds": 205,
+                        "errorMessage": "Cannot access value for name modelData",
+                        "functionName": "text",
+                        "line": 128
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 61,
+                        "durationMicroseconds": 57,
+                        "errorMessage": "",
+                        "functionName": "verticalCenter",
+                        "line": 130
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 51,
+                        "durationMicroseconds": 48,
+                        "errorMessage": "",
+                        "functionName": "left",
+                        "line": 131
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 39,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find signal \"clicked\".",
+                        "functionName": "onClicked",
+                        "line": 140
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 53,
+                        "durationMicroseconds": 0,
+                        "errorMessage": "Could not find property \"verticalCenter\".",
+                        "functionName": "verticalCenter",
+                        "line": 139
+                    }
+                ],
+                "filePath": "/home/suo/Qt_project/ MyFolder/MyFolder/operation.qml"
+            }
+        ],
+        "moduleId": "MyTest(appMyTest)"
+    }
+]

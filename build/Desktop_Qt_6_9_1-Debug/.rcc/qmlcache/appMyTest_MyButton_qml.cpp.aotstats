@@ -1,0 +1,116 @@
+[
+    {
+        "moduleFiles": [
+            {
+                "entries": [
+                    {
+                        "codegenSuccessful": true,
+                        "column": 11,
+                        "durationMicroseconds": 258,
+                        "errorMessage": "",
+                        "functionName": "width",
+                        "line": 12
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 12,
+                        "durationMicroseconds": 111,
+                        "errorMessage": "",
+                        "functionName": "height",
+                        "line": 13
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 16,
+                        "durationMicroseconds": 123,
+                        "errorMessage": "Cannot access value for name buttonRadius",
+                        "functionName": "radius",
+                        "line": 17
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 15,
+                        "durationMicroseconds": 112,
+                        "errorMessage": "",
+                        "functionName": "width",
+                        "line": 18
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 35,
+                        "durationMicroseconds": 99,
+                        "errorMessage": "",
+                        "functionName": "height",
+                        "line": 18
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 15,
+                        "durationMicroseconds": 226,
+                        "errorMessage": "Cannot access value for name hovercolor",
+                        "functionName": "color",
+                        "line": 19
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 35,
+                        "durationMicroseconds": 163,
+                        "errorMessage": "",
+                        "functionName": "horizontalCenter",
+                        "line": 20
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 15,
+                        "durationMicroseconds": 103,
+                        "errorMessage": "",
+                        "functionName": "text",
+                        "line": 22
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 16,
+                        "durationMicroseconds": 139,
+                        "errorMessage": "",
+                        "functionName": "color",
+                        "line": 25
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 25,
+                        "durationMicroseconds": 96,
+                        "errorMessage": "",
+                        "functionName": "pixelSize",
+                        "line": 23
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 28,
+                        "durationMicroseconds": 73,
+                        "errorMessage": "",
+                        "functionName": "centerIn",
+                        "line": 24
+                    },
+                    {
+                        "codegenSuccessful": false,
+                        "column": 19,
+                        "durationMicroseconds": 102,
+                        "errorMessage": "Type  does not have a property onClickedFunc for calling",
+                        "functionName": "onClicked",
+                        "line": 31
+                    },
+                    {
+                        "codegenSuccessful": true,
+                        "column": 23,
+                        "durationMicroseconds": 71,
+                        "errorMessage": "",
+                        "functionName": "fill",
+                        "line": 29
+                    }
+                ],
+                "filePath": "/home/suo/Qt_project/ MyFolder/MyFolder/MyButton.qml"
+            }
+        ],
+        "moduleId": "MyTest(appMyTest)"
+    }
+]

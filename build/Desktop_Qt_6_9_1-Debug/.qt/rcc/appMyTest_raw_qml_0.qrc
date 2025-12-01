@@ -1,0 +1,16 @@
+<RCC>
+  <qresource prefix="/qt/qml/MyTest/">
+    <file alias="Main.qml">/home/suo/Qt_project/ MyFolder/MyFolder/Main.qml</file>
+    <file alias="InputText.qml">/home/suo/Qt_project/ MyFolder/MyFolder/InputText.qml</file>
+    <file alias="MyButton.qml">/home/suo/Qt_project/ MyFolder/MyFolder/MyButton.qml</file>
+    <file alias="test.qml">/home/suo/Qt_project/ MyFolder/MyFolder/test.qml</file>
+    <file alias="mainWindow.qml">/home/suo/Qt_project/ MyFolder/MyFolder/mainWindow.qml</file>
+    <file alias="operation.qml">/home/suo/Qt_project/ MyFolder/MyFolder/operation.qml</file>
+    <file alias="Icons/password.svg">/home/suo/Qt_project/ MyFolder/MyFolder/Icons/password.svg</file>
+    <file alias="Icons/user.svg">/home/suo/Qt_project/ MyFolder/MyFolder/Icons/user.svg</file>
+    <file alias="Icons/file.svg">/home/suo/Qt_project/ MyFolder/MyFolder/Icons/file.svg</file>
+    <file alias="Icons/folder.svg">/home/suo/Qt_project/ MyFolder/MyFolder/Icons/folder.svg</file>
+    <file alias="Icons/app.ico">/home/suo/Qt_project/ MyFolder/MyFolder/Icons/app.ico</file>
+  </qresource>
+</RCC>
+

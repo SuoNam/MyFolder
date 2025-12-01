@@ -1,0 +1,32 @@
+{
+    "classes": [
+        {
+            "className": "Fat12Format",
+            "lineNumber": 6,
+            "methods": [
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "filePath",
+                            "type": "QString"
+                        }
+                    ],
+                    "index": 0,
+                    "name": "format",
+                    "returnType": "void"
+                }
+            ],
+            "object": true,
+            "qualifiedClassName": "Fat12Format",
+            "superClasses": [
+                {
+                    "access": "public",
+                    "name": "QObject"
+                }
+            ]
+        }
+    ],
+    "inputFile": "fat12format.h",
+    "outputRevision": 69
+}

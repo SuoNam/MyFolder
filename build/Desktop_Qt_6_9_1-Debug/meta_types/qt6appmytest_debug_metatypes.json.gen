@@ -1,0 +1,102 @@
+[
+    {
+        "classes": [
+            {
+                "className": "Command",
+                "lineNumber": 6,
+                "methods": [
+                    {
+                        "access": "public",
+                        "arguments": [
+                            {
+                                "name": "type",
+                                "type": "QString"
+                            },
+                            {
+                                "name": "args",
+                                "type": "QStringList"
+                            }
+                        ],
+                        "index": 0,
+                        "name": "excel",
+                        "returnType": "QStringList"
+                    }
+                ],
+                "object": true,
+                "qualifiedClassName": "Command",
+                "superClasses": [
+                    {
+                        "access": "public",
+                        "name": "QObject"
+                    }
+                ]
+            }
+        ],
+        "inputFile": "command.h",
+        "outputRevision": 69
+    },
+    {
+        "classes": [
+            {
+                "className": "Fat12Format",
+                "lineNumber": 6,
+                "methods": [
+                    {
+                        "access": "public",
+                        "arguments": [
+                            {
+                                "name": "filePath",
+                                "type": "QString"
+                            }
+                        ],
+                        "index": 0,
+                        "name": "format",
+                        "returnType": "void"
+                    }
+                ],
+                "object": true,
+                "qualifiedClassName": "Fat12Format",
+                "superClasses": [
+                    {
+                        "access": "public",
+                        "name": "QObject"
+                    }
+                ]
+            }
+        ],
+        "inputFile": "fat12format.h",
+        "outputRevision": 69
+    },
+    {
+        "classes": [
+            {
+                "className": "OCR",
+                "lineNumber": 6,
+                "methods": [
+                    {
+                        "access": "public",
+                        "arguments": [
+                            {
+                                "name": "imagePath",
+                                "type": "QString"
+                            }
+                        ],
+                        "index": 0,
+                        "name": "test",
+                        "returnType": "void"
+                    }
+                ],
+                "object": true,
+                "qualifiedClassName": "OCR",
+                "superClasses": [
+                    {
+                        "access": "public",
+                        "name": "QObject"
+                    }
+                ]
+            }
+        ],
+        "inputFile": "ocr.h",
+        "outputRevision": 69
+    }
+]

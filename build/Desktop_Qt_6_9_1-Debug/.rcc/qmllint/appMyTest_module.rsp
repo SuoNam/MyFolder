@@ -1,0 +1,10 @@
+-I
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug
+-I
+/home/suo/Qt/6.9.1/gcc_64/qml
+--resource
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/.qt/rcc/qmake_MyTest.qrc
+--resource
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/.qt/rcc/appMyTest_raw_qml_0.qrc
+--module
+MyTest

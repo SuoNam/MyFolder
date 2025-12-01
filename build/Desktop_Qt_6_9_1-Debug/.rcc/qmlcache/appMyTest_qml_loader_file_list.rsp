@@ -1,0 +1,10 @@
+--resource
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/.qt/rcc/qmake_MyTest.qrc
+--resource
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/.qt/rcc/appMyTest_raw_qml_0.qrc
+/qt/qml/MyTest/Main.qml
+/qt/qml/MyTest/InputText.qml
+/qt/qml/MyTest/MyButton.qml
+/qt/qml/MyTest/test.qml
+/qt/qml/MyTest/mainWindow.qml
+/qt/qml/MyTest/operation.qml

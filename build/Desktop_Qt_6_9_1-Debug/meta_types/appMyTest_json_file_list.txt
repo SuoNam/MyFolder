@@ -1,0 +1,3 @@
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/appMyTest_autogen/include/../EWIEGA46WW/moc_command.cpp.json
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/appMyTest_autogen/include/../EWIEGA46WW/moc_fat12format.cpp.json
+/home/suo/Qt_project/ MyFolder/MyFolder/build/Desktop_Qt_6_9_1-Debug/appMyTest_autogen/include/../EWIEGA46WW/moc_ocr.cpp.json

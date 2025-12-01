@@ -1,0 +1,36 @@
+{
+    "classes": [
+        {
+            "className": "Command",
+            "lineNumber": 6,
+            "methods": [
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "type",
+                            "type": "QString"
+                        },
+                        {
+                            "name": "args",
+                            "type": "QStringList"
+                        }
+                    ],
+                    "index": 0,
+                    "name": "excel",
+                    "returnType": "QStringList"
+                }
+            ],
+            "object": true,
+            "qualifiedClassName": "Command",
+            "superClasses": [
+                {
+                    "access": "public",
+                    "name": "QObject"
+                }
+            ]
+        }
+    ],
+    "inputFile": "command.h",
+    "outputRevision": 69
+}
