@@ -3,16 +3,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import xyz.suonan.myfolder_sever.BaseMessage.BaseMessage;
+import xyz.suonan.myfolder_sever.MyObject.FileInfo;
+import xyz.suonan.myfolder_sever.Service.Checker.FileChunksCheck;
+import xyz.suonan.myfolder_sever.Service.FileInfoService;
 import xyz.suonan.myfolder_sever.Utils.WrapFileBaseItem;
 import xyz.suonan.myfolder_sever.MyObject.Item.FileBaseItem;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,13 +31,11 @@ public class FileHttpController {
     @Value("${basePath}")
     private String basePath;
     @Autowired
+    private FileChunksCheck fileChunksCheck;
+    @Autowired
     private WrapFileBaseItem wrapFileBaseItem;
-
-    //获取文件夹内的内容
-    /* 文件格式：{type:file,fileName:...,size:...,createDate:...}
-    *  文件夹格式:{type:directory,directoryName:...,[文件||文件夹]}
-    *  返回一个文件夹对象
-    * */
+    @Autowired
+    private FileInfoService fileInfoService;
     @PostMapping("/getfilelist")
     public BaseMessage<List<FileBaseItem>> getFileList(@RequestBody Map<String, String> directoryPathMap) throws IOException {
         String directoryPath=directoryPathMap.get("directoryPath");
@@ -50,11 +53,16 @@ public class FileHttpController {
     public ResponseEntity<Resource> downLoadFile(@RequestParam String filePathS) throws IOException {
         Path filePath= Paths.get(basePath,filePathS);
         Resource resource = new UrlResource(filePath.toUri());
+        String filename = resource.getFilename();
+        ContentDisposition disposition = ContentDisposition
+                .attachment()
+                .filename(filename, StandardCharsets.UTF_8)
+                .build();
 
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)  // 通用二进制流类型
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
-                .header("Access-Control-Expose-Headers", "Content-Disposition")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION)
                 .body(resource);
     }
     @PostMapping("/uploadfile")
@@ -71,6 +79,8 @@ public class FileHttpController {
             try {
                 file.transferTo(dest); // 保存文件
                 //TODO::添加对file_info表的添加
+
+                fileInfoService.insertFileInfo(new FileInfo());
                 fileBaseItemList.add(new BaseMessage<>(200, "上传成功", file.getOriginalFilename()));
             } catch (IOException e) {
                 //日志打印错误信息

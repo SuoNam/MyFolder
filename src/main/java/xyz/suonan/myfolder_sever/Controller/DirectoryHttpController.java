@@ -106,7 +106,6 @@ public class DirectoryHttpController {
         partTimer.begin();
         directoryInfo.setId(IdGen.generateId());
         directoryInfo.setCreationDate(new Date());
-
         int code=directoryInfoService.addDirectoryInfo(directoryInfo);
         if(code!=1){
             return new BaseMessage<>(500,"创建失败", ErrorType.resolve(code,"sql"));
@@ -132,19 +131,14 @@ public class DirectoryHttpController {
         }
         //获取upload的parentPath
         String parentName=directoryInfoService.getParentNameById(uploadId);
-
         List<FileInfoUpload> files =filesInfo.get("entries");
         List<FileInfoResponse> data = new ArrayList<>();
         for (FileInfoUpload fileInfoUpload : files) {
-
             String absolutePath = String.valueOf(Paths.get(basePath,parentName,fileInfoUpload.getPath()));
             String relativelyPath=fileInfoUpload.getPath();
             //存上传文件夹 相对路径 绝对路径
             folderFileAbsoluteService.createFolderFileAbsolute(uploadId,relativelyPath,absolutePath);
-
             FileInfoResponse fileInfoResponse = new FileInfoResponse(fileInfoUpload.getPath(),fileInfoUpload.getSha256());
-            //添加文件元信息到directory_file中 相对路径
-            //directoryFileService.addDirectoryFile(uploadId,relativelyPath);
             //判断文件是不是空文件
             int totalChunks = fileInfoUpload.getTotalChunks();
             if(totalChunks==0){
@@ -157,7 +151,6 @@ public class DirectoryHttpController {
                 //添加文件元信息到file_info中 绝对路径
                 fileInfoService.insertFileInfo(fileInfoUpload);
             }else{
-
                 //TODO::添加文件大小控制||对短期的重复上传没有文件大小限制
                 if(fileInfoService.sha256isExists(fileInfoUpload)){
                     fileInfoResponse.setExists(true);
