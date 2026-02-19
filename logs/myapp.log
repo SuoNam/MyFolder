@@ -1,0 +1,17 @@
+2026-02-13T14:45:00.662+08:00  INFO 3464 --- [MyFolder_Sever] [main] x.s.m.MyFolderSeverApplication           : Starting MyFolderSeverApplication using Java 17.0.12 with PID 3464 (C:\Users\Lenovo\Desktop\MyFolder\MyFolder_Offline\target\classes started by Lenovo in C:\Users\Lenovo\Desktop\MyFolder\MyFolder_Offline)
+2026-02-13T14:45:00.671+08:00  INFO 3464 --- [MyFolder_Sever] [main] x.s.m.MyFolderSeverApplication           : The following 1 profile is active: "formal"
+2026-02-13T14:45:01.743+08:00  INFO 3464 --- [MyFolder_Sever] [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-02-13T14:45:01.747+08:00  INFO 3464 --- [MyFolder_Sever] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-02-13T14:45:01.806+08:00  INFO 3464 --- [MyFolder_Sever] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 41 ms. Found 0 Redis repository interfaces.
+2026-02-13T14:45:02.555+08:00  INFO 3464 --- [MyFolder_Sever] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+2026-02-13T14:45:02.571+08:00  INFO 3464 --- [MyFolder_Sever] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-02-13T14:45:02.571+08:00  INFO 3464 --- [MyFolder_Sever] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.40]
+2026-02-13T14:45:02.706+08:00  INFO 3464 --- [MyFolder_Sever] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-02-13T14:45:02.706+08:00  INFO 3464 --- [MyFolder_Sever] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1984 ms
+2026-02-13T14:45:03.831+08:00  INFO 3464 --- [MyFolder_Sever] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+2026-02-13T14:45:03.888+08:00  INFO 3464 --- [MyFolder_Sever] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path '/'
+2026-02-13T14:45:03.900+08:00  INFO 3464 --- [MyFolder_Sever] [main] x.s.m.MyFolderSeverApplication           : Started MyFolderSeverApplication in 3.803 seconds (process running for 4.854)
+2026-02-13T14:45:04.605+08:00  INFO 3464 --- [MyFolder_Sever] [RMI TCP Connection(3)-198.18.0.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-02-13T14:45:04.606+08:00  INFO 3464 --- [MyFolder_Sever] [RMI TCP Connection(3)-198.18.0.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-02-13T14:45:04.607+08:00  INFO 3464 --- [MyFolder_Sever] [RMI TCP Connection(3)-198.18.0.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-02-13T14:45:04.626+08:00  INFO 3464 --- [MyFolder_Sever] [RMI TCP Connection(2)-198.18.0.1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
