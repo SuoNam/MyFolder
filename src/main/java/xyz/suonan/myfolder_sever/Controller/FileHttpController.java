@@ -13,15 +13,14 @@ import xyz.suonan.myfolder_sever.BaseMessage.BaseMessage;
 import xyz.suonan.myfolder_sever.MyObject.FileInfo;
 import xyz.suonan.myfolder_sever.Service.Checker.FileChunksCheck;
 import xyz.suonan.myfolder_sever.Service.FileInfoService;
+import xyz.suonan.myfolder_sever.Utils.FileHashUtil;
 import xyz.suonan.myfolder_sever.Utils.WrapFileBaseItem;
 import xyz.suonan.myfolder_sever.MyObject.Item.FileBaseItem;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Stream;
 
 @RequestMapping("/file")
@@ -30,8 +29,6 @@ public class FileHttpController {
     private static final org.slf4j.Logger log =org.slf4j.LoggerFactory.getLogger(FileHttpController.class);
     @Value("${basePath}")
     private String basePath;
-    @Autowired
-    private FileChunksCheck fileChunksCheck;
     @Autowired
     private WrapFileBaseItem wrapFileBaseItem;
     @Autowired
@@ -74,13 +71,12 @@ public class FileHttpController {
                 fileBaseItemList.add(new BaseMessage<>(500, "上传失败:目录不存在", file.getOriginalFilename()));
                 continue;
             }
-            Path start = Paths.get(basePath, path, file.getOriginalFilename());
+            Path start = Paths.get(basePath, path, file.getOriginalFilename()).normalize();
             File dest = new File(start.toFile().getAbsolutePath());
             try {
                 file.transferTo(dest); // 保存文件
-                //TODO::添加对file_info表的添加
-
-                fileInfoService.insertFileInfo(new FileInfo());
+                //添加对file_info表的添加
+                fileInfoService.insertFileInfo(new FileInfo(dest.getAbsolutePath(),dest.length(),dest.lastModified(), HexFormat.of().parseHex(FileHashUtil.calculateSHA256(dest))));
                 fileBaseItemList.add(new BaseMessage<>(200, "上传成功", file.getOriginalFilename()));
             } catch (IOException e) {
                 //日志打印错误信息
@@ -102,15 +98,16 @@ public class FileHttpController {
         return new BaseMessage<>(200,"创造成功",null);
 
     }
-    @PostMapping("/rename")
-    public BaseMessage<List<BaseMessage<String>>> rename(@RequestBody List<Map<String,String>> pathMap){
+    @PostMapping("/move")
+    public BaseMessage<List<BaseMessage<String>>> move(@RequestBody List<Map<String,String>> pathMap){
         List<BaseMessage<String>> fileBaseItemList=new ArrayList<>();
         for (Map<String, String> stringStringMap : pathMap) {
-            Path source = Paths.get(basePath, stringStringMap.get("targetPath"));
-            Path target = Paths.get(basePath, stringStringMap.get("newPath"));
+            Path source = Paths.get(basePath, stringStringMap.get("targetPath")).normalize();
+            Path target = Paths.get(basePath, stringStringMap.get("newPath")).normalize();
             try {
                 Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-                //TODO::添加对file_info的修改
+                //添加对file_info的修改
+                fileInfoService.updateFileInfoByPath(source.toString(),target.toString());
                 fileBaseItemList.add(new BaseMessage<>(200, "移动成功", stringStringMap.get("targetPath")));
             } catch (IOException e) {
                 log.error(e.getMessage());
@@ -119,15 +116,27 @@ public class FileHttpController {
         }
         return new BaseMessage<>(200,"移动完毕",fileBaseItemList);
     }
-    @PostMapping("delete")
+    @PostMapping("/delete")
     public BaseMessage<List<BaseMessage<String>>> delete(@RequestBody List<Map<String,String>> pathMap){
         List<BaseMessage<String>> fileBaseItemList=new ArrayList<>();
         for (Map<String, String> stringStringMap : pathMap) {
-            Path source = Paths.get(basePath, stringStringMap.get("deletePath"));
+            Path source = Paths.get(basePath, stringStringMap.get("deletePath")).normalize();
             try{
-                //TODO::修改为可删除文件夹
-                //TODO::添加对file_info的删除
-                Files.delete(source);
+                //修改为可删除文件夹
+                Files.walk(source)
+                        .sorted(Comparator.reverseOrder())
+                        .forEach(p -> {
+                            try {
+                                boolean isFile=p.toFile().isFile();
+                                Files.delete(p);
+                                if(isFile){
+                                    //对file_info的删除
+                                    fileInfoService.deleteFileByPath(p.toAbsolutePath().toString());
+                                }
+                            } catch (IOException e) {
+                                throw new RuntimeException("删除失败: " + p, e);
+                            }
+                        });
                 fileBaseItemList.add(new BaseMessage<>(200, "删除成功", stringStringMap.get("deletePath")));
             }catch (NoSuchFileException e) {
                 fileBaseItemList.add(new BaseMessage<>(500, "删除失败:文件或目录不存在", stringStringMap.get("deletePath")));
@@ -137,6 +146,23 @@ public class FileHttpController {
         }
         return new BaseMessage<>(200,"删除完毕",fileBaseItemList);
     }
-
-
+    @PostMapping("/copy")
+    public BaseMessage<List<BaseMessage<String>>> copy(@RequestBody List<Map<String,String>> pathMap){
+        List<BaseMessage<String>> fileBaseItemList=new ArrayList<>();
+        for (Map<String, String> stringStringMap : pathMap) {
+            Path source = Paths.get(basePath, stringStringMap.get("targetPath")).normalize();
+            Path target = Paths.get(basePath, stringStringMap.get("newPath")).normalize();
+            try {
+                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                //添加对file_info的修改
+                File dest = new File(target.toFile().getAbsolutePath());
+                fileInfoService.insertFileInfo(new FileInfo(dest.getAbsolutePath(),dest.length(),dest.lastModified(), HexFormat.of().parseHex(FileHashUtil.calculateSHA256(dest))));
+                fileBaseItemList.add(new BaseMessage<>(200, "复制成功", stringStringMap.get("targetPath")));
+            } catch (IOException e) {
+                log.error(e.getMessage());
+                fileBaseItemList.add(new BaseMessage<>(500, "复制失败", stringStringMap.get("targetPath")));
+            }
+        }
+        return new BaseMessage<>(200,"移动完毕",fileBaseItemList);
+    }
 }

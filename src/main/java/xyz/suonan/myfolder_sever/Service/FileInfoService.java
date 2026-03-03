@@ -14,7 +14,7 @@ public class FileInfoService{
     FileInfoDao fileInfoDao;
 
     public boolean sha256isExists(FileBase file){
-        List<String> filelist=fileInfoDao.select(file.getSha256());
+        List<String> filelist=fileInfoDao.selectBySha256(file.getSha256());
         return filelist!=null&& !filelist.isEmpty();
     }
 
@@ -22,7 +22,10 @@ public class FileInfoService{
         return fileInfoDao.insert(file)!=1;
     }
     public List<String> selectPathBySha256(FileInfo file){
-        return fileInfoDao.select(file.getSha256());
+        return fileInfoDao.selectBySha256(file.getSha256());
+    }
+    public boolean updateFileInfoByPath(String oldPath,String newFile){
+        return fileInfoDao.updatePathByPath(oldPath,newFile)!=1;
     }
     public void deleteFileByPath(String path){
         fileInfoDao.deleteByPath(path);

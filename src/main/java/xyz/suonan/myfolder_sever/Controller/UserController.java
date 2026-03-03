@@ -38,7 +38,5 @@ public class UserController {
         Map<String,String> tokenMap = new HashMap<>();
         tokenMap.put("token",jwtGen.genJwt(user.account));
         return new BaseMessage<>(200,"登录成功",tokenMap);
-
-
     }
 }

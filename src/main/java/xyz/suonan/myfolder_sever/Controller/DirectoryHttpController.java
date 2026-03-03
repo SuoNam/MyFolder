@@ -1,9 +1,7 @@
 package xyz.suonan.myfolder_sever.Controller;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -11,7 +9,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import xyz.suonan.myfolder_sever.BaseMessage.BaseMessage;
-import xyz.suonan.myfolder_sever.Dao.DirectoryFileDao;
 import xyz.suonan.myfolder_sever.Error.ErrorType;
 import xyz.suonan.myfolder_sever.MyObject.FileInfo;
 import xyz.suonan.myfolder_sever.MyObject.FileInfoResponse;
@@ -27,7 +24,6 @@ import xyz.suonan.myfolder_sever.Service.Writer.FileChunkWriter;
 import xyz.suonan.myfolder_sever.Utils.FileZipService;
 import xyz.suonan.myfolder_sever.Utils.IdGen;
 import xyz.suonan.myfolder_sever.pojo.DirectoryInfo;
-
 import java.io.*;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -37,24 +33,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 @RequestMapping("/directory")
 @RestController
 @RequiredArgsConstructor
 public class DirectoryHttpController {
-    private final ReentrantLock lock = new ReentrantLock();
-    private final Condition condition = lock.newCondition();
-
-
     private final PartTimer partTimer;
     private final TotalTimer totalTimer;
-
     private final FileZipService fileZipService;
     private final DirectoryInfoService directoryInfoService;
     private final FileInfoService fileInfoService;
@@ -63,14 +49,11 @@ public class DirectoryHttpController {
     private final FileChunkSha256Service fileChunkSha256Service;
     private final FileChunkWriter fileChunkWriter;
     private final FileChunksCheck fileChunksCheck;
-
-
+    private final FileChunkTaskCountService fileChunkTaskCountService;
     private final FileTaskExecutor fileTaskExecutor;
     private final FolderFilesStatusService folderFilesStatusService;
-
     private final UploadRecoveryManager uploadRecoveryManager;
     private final ObjectMapper objectMapper;
-
     @Value("${basePath}")
     private String basePath;
     private static final Logger log = LoggerFactory.getLogger(DirectoryHttpController.class);
@@ -134,8 +117,11 @@ public class DirectoryHttpController {
         List<FileInfoUpload> files =filesInfo.get("entries");
         List<FileInfoResponse> data = new ArrayList<>();
         for (FileInfoUpload fileInfoUpload : files) {
-            String absolutePath = String.valueOf(Paths.get(basePath,parentName,fileInfoUpload.getPath()));
-            String relativelyPath=fileInfoUpload.getPath();
+            String absolutePath = String.valueOf(Paths.get(basePath,parentName,fileInfoUpload.getPath()).normalize());
+            if(!absolutePath.startsWith(Paths.get(basePath).normalize().toString())){
+                return new BaseMessage<>(500,"路径错误",null);
+            }
+            String relativelyPath=Path.of(fileInfoUpload.getPath()).normalize().toString();
             //存上传文件夹 相对路径 绝对路径
             folderFileAbsoluteService.createFolderFileAbsolute(uploadId,relativelyPath,absolutePath);
             FileInfoResponse fileInfoResponse = new FileInfoResponse(fileInfoUpload.getPath(),fileInfoUpload.getSha256());
@@ -150,6 +136,7 @@ public class DirectoryHttpController {
                 fileInfoUpload.setPath(absolutePath);
                 //添加文件元信息到file_info中 绝对路径
                 fileInfoService.insertFileInfo(fileInfoUpload);
+                folderFilesStatusService.setFileStatus(uploadId,relativelyPath,1);
             }else{
                 //TODO::添加文件大小控制||对短期的重复上传没有文件大小限制
                 if(fileInfoService.sha256isExists(fileInfoUpload)){
@@ -160,6 +147,7 @@ public class DirectoryHttpController {
                     try{
                         Files.createDirectories(targetFile.getParent());
                         Files.copy(sourceFile,targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                        folderFilesStatusService.setFileStatus(uploadId,relativelyPath,1);
                     }catch (IOException e) {
                         //扫描directory_file 删除uploadId对应的项和其对应的文件
                         //TODO::验证uploadId过期后回滚
@@ -213,12 +201,23 @@ public class DirectoryHttpController {
         String relativePath = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
         String parentName=directoryInfoService.getParentNameById(uploadId);
         //绝对路径
-        String absolutePath = String.valueOf(Paths.get(basePath,parentName,relativePath));
-
+        String absolutePath = String.valueOf(Paths.get(basePath,parentName,relativePath).normalize());
+        if(!absolutePath.startsWith(Paths.get(basePath).normalize().toString())){
+            return new BaseMessage<>(500,"路径错误",null);
+        }
         FolderFileWriteTask fileWriteTask=new FolderFileWriteTask(absolutePath,relativePath,uploadId,
-                pageNumber,totalChunks,inputStream,Offset,fileChunkWriter,fileChunkBitmapService);
+                pageNumber,totalChunks,inputStream,Offset,fileChunkWriter,fileChunkBitmapService,fileChunkTaskCountService);
         //加入线程池
-        fileTaskExecutor.submit(fileWriteTask);
+        //WriteTask计数器 计数器+1
+        fileChunkTaskCountService.addFileChunkTaskCount(uploadId,absolutePath);
+        try{
+            fileTaskExecutor.submit(fileWriteTask);
+        }catch (Exception e) {
+            // 提交失败，必须把刚才加的 1 减回去！
+            fileChunkTaskCountService.removeFileChunkTaskCount(uploadId,absolutePath);
+            throw e;
+        }
+
 
         Map<String,Map<String,String>> map = new HashMap<>();
         map.put("data",sha26Map);
@@ -234,66 +233,59 @@ public class DirectoryHttpController {
         String relativePath=completeChunk.get("filePath");
         int totalChunks=Integer.parseInt(completeChunk.get("totalParts"));
         long fileSize=Long.parseLong(completeChunk.get("fileSize"));
-
         String parentName=directoryInfoService.getParentNameById(uploadId);
-        String absolutePath=String.valueOf(Paths.get(basePath,parentName,relativePath));
-
+        String absolutePath=String.valueOf(Paths.get(basePath,parentName,relativePath).normalize());
+        if(!absolutePath.startsWith(Paths.get(basePath).normalize().toString())){
+            return new BaseMessage<>(500,"路径错误",null);
+        }
         Map<String,String> map=new HashMap<>();
         //检测位点图是否完整
         //添加看是线程没写完导致的还是前端没有发过来 相对路径
-        lock.lock();
-        try {
-            int retry = 0;
-            int maxRetry = 1000; // 1000*100ms = 100s 超时控制
-
-            while (true) {
-                Map<String, Object> bitmapCheckResult = fileChunkBitmapService.isComplete(uploadId, relativePath, totalChunks);
-                boolean isComplete = (Boolean) bitmapCheckResult.get("isComplete");
-                int activeCount = fileTaskExecutor.getThreadActiveCount();
-
-                // 条件：所有线程结束 且 位图完整 -> 成功退出
-                if (isComplete && activeCount == 0) {
-                    break;
-                }
-
-                // 条件：线程都结束了 但 位图仍不完整 -> 真正的失败（回滚）
-                if (!isComplete && activeCount == 0) {
-                    //TODO::验证uploadId过期后回滚
-                    log.warn("检测到位图不完整，执行回滚 uploadId=" + uploadId);
-                    List<Integer> missChunks = (List<Integer>) bitmapCheckResult.get("missChunks");
-                    Map<String, List<Integer>> missChunksMap = Map.of("missChunks", missChunks);
-                    map.put("data", objectMapper.writeValueAsString(missChunksMap));
-                    uploadRecoveryManager.Recover(uploadId);
-                    return new BaseMessage<>(500, "切片不完整", map);
-                }
-
-                if (retry++ > maxRetry) {
-                    return new BaseMessage<>(500, "等待超时，仍有文件未完成", null);
-                }
-                condition.await(100, TimeUnit.MILLISECONDS);
+        long startTime = System.currentTimeMillis();
+        long maxWaitTime = 30 * 1000;
+        //ToDO::权宜之计
+        while (true) {
+            Map<String, Object> bitmapCheckResult = fileChunkBitmapService.isComplete(uploadId, relativePath, totalChunks);
+            boolean isComplete = (Boolean) bitmapCheckResult.get("isComplete");
+            int currentTaskCount=fileChunkTaskCountService.getFileChunkTaskCount(uploadId,absolutePath);
+            // 条件：所有线程结束 且 位图完整 -> 成功退出
+            if (isComplete && currentTaskCount == 0) {
+                break;
             }
-
-        } finally {
-            lock.unlock();
+            // 条件：线程都结束了 但 位图仍不完整 -> 真正的失败（回滚）
+            if (!isComplete && currentTaskCount == 0) {
+                //TODO::验证uploadId过期后回滚
+                log.warn("检测到位图不完整，执行回滚 uploadId=" + uploadId);
+                List<Integer> missChunks = (List<Integer>) bitmapCheckResult.get("missChunks");
+                Map<String, List<Integer>> missChunksMap = Map.of("missChunks", missChunks);
+                map.put("data", objectMapper.writeValueAsString(missChunksMap));
+                uploadRecoveryManager.Recover(uploadId);
+                return new BaseMessage<>(500, "切片不完整", map);
+            }
+            if (System.currentTimeMillis() - startTime > maxWaitTime) {
+                log.error("等待分片写入超时 uploadId={}", uploadId);
+                return new BaseMessage<>(504, "服务器处理超时，请重试", null);
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return new BaseMessage<>(500, "系统中断", null);
+            }
         }
-
-        Thread.sleep(100);
         //文件完整性检验 绝对路径
         if(!fileChunksCheck.check(absolutePath)){
             //扫描directory_file 删除uploadId对应的项和其对应的文件
             uploadRecoveryManager.Recover(uploadId);
             return new BaseMessage<>(200,"文件不完整",null);
         }
-        //文件元信息存到数据库中 绝对路径
-        File file = new File(absolutePath);
-
         //Folder:uploadId   filename values的Hash表 存文件写入状态 相对路径
         folderFilesStatusService.setFileStatus(uploadId,relativePath,1);
         //添加文件元信息到file_info中 绝对路径
+        File file = new File(absolutePath);
         fileInfoService.insertFileInfo(new FileInfo(absolutePath,fileSize,file.lastModified(),HexFormat.of().parseHex(fileChunkSha256Service.getFileChunkSha256(absolutePath))));
 
 //        fileCountService.addFileCount(uploadId);
-
         Map<String,String> filePathMap=new HashMap<>();
         filePathMap.put("filePath",relativePath);
         String filePath=objectMapper.writeValueAsString(filePathMap);
@@ -303,33 +295,21 @@ public class DirectoryHttpController {
     }
     @PostMapping("/{uploadId}/complete")
     public BaseMessage<Map<String,String>> complete(@PathVariable String uploadId,@RequestBody Map<String,String> completeChunk) throws InterruptedException, IOException {
-        //TODO::添加一个验证uploadId
         partTimer.name="/"+uploadId+"/complete";
         partTimer.begin();
-
         int fileCount=Integer.parseInt(completeChunk.get("totalFiles"));
-
         //查询当前的uploadId的文件状态数组 若都完成文件检验->放行  若未完成->阻塞等待
-        //TODO::出现卡死现象 问题尚未清楚
         int retry = 0, maxRetry = 5000;
         while (!folderFilesStatusService.getFileStatus(uploadId).values().stream().allMatch(v->v==1)) {
             if (retry++ > maxRetry) {
                 //TODO::验证uploadId过期后回滚
                 log.info("出现问题执行回滚");
                 uploadRecoveryManager.Recover(uploadId);
-
                 return new BaseMessage<>(500, "等待超时，仍有文件未完成", null);
             }
             Thread.sleep(200);
         }
-
-//        int redisFileCount=fileCountService.getFileCount(uploadId);
-//        if(fileCount!=redisFileCount){
-//            //扫描directory_file 删除uploadId对应的项和其对应的文件
-//
-//            return new BaseMessage<>(500,"未上传完全",null);
-//        }
-//        fileCountService.deleteFileCount(uploadId);
+        directoryInfoService.deleteDirectoryInfo(uploadId);
         partTimer.close();
         totalTimer.close();
         return new BaseMessage<>(200,"上传成功",null);
