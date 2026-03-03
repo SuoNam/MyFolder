@@ -1,0 +1,8 @@
+2025-12-05T12:53:18.417+08:00  INFO 102776 --- [MyFolder_Sever] [main] x.s.m.MyFolderSeverApplicationTests      : Starting MyFolderSeverApplicationTests using Java 17.0.15 with PID 102776 (started by suo in /home/suo/java_projects/MyFolder_Sever)
+2025-12-05T12:53:18.432+08:00  INFO 102776 --- [MyFolder_Sever] [main] x.s.m.MyFolderSeverApplicationTests      : The following 1 profile is active: "development"
+2025-12-05T12:53:20.655+08:00  INFO 102776 --- [MyFolder_Sever] [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2025-12-05T12:53:20.662+08:00  INFO 102776 --- [MyFolder_Sever] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2025-12-05T12:53:20.756+08:00  INFO 102776 --- [MyFolder_Sever] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 37 ms. Found 0 Redis repository interfaces.
+2025-12-05T12:53:23.541+08:00  INFO 102776 --- [MyFolder_Sever] [main] o.a.ftpserver.impl.DefaultFtpServer      : FTP server started
+2025-12-05T12:53:25.276+08:00  INFO 102776 --- [MyFolder_Sever] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+2025-12-05T12:53:25.489+08:00  INFO 102776 --- [MyFolder_Sever] [main] x.s.m.MyFolderSeverApplicationTests      : Started MyFolderSeverApplicationTests in 7.867 seconds (process running for 9.786)

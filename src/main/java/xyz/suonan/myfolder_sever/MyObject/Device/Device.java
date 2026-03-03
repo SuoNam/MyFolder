@@ -1,4 +1,4 @@
-package xyz.suonan.myfolder_sever.MyObject;
+package xyz.suonan.myfolder_sever.MyObject.Device;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
