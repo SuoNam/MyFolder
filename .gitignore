@@ -1,1 +1,25 @@
-CMakeLists.txt.user
+﻿# Build output and IDE state
+build/
+build-*/
+dist/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.user
+
+# Local IDE and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Generated binaries and runtime artifacts
+*.exe
+*.dll
+*.pdb
+*.obj
+*.o
+*.a
+*.lib

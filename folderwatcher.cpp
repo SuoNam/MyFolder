@@ -1,3 +1,6 @@
 #include "folderwatcher.h"
 
-FolderWatcher::FolderWatcher() {}
+FolderWatcher::FolderWatcher() {
+
+
+}

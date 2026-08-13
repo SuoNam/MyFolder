@@ -1,0 +1,4 @@
+LIBRARY MyFolderShellExtension
+EXPORTS
+    DllCanUnloadNow
+    DllGetClassObject
