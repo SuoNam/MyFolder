@@ -1,34 +1,36 @@
-HELP.md
-target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+﻿# Secrets and local environment files
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.jks
+*.keystore
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# Java / Maven
+**/target/
+**/logs/
+*.log
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
+# Node / Web source build caches
+**/node_modules/
+**/.vite/
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+# CMake / Qt
+**/build/
+**/build-*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/Makefile
+**/*.user
 
-### VS Code ###
+# Editors and operating systems
+.idea/
 .vscode/
-./SharePath/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Runtime data
+**/.myfolder/

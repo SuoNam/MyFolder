@@ -1,0 +1,18 @@
+package xyz.suonan.myfolder_sever.transfer.error;
+
+public enum TransferErrorCode {
+    INVALID_REQUEST,
+    INVALID_PATH,
+    TASK_NOT_FOUND,
+    FILE_NOT_FOUND,
+    TASK_STATE_CONFLICT,
+    CHUNK_INDEX_INVALID,
+    CHUNK_RANGE_INVALID,
+    CHUNK_SIZE_INVALID,
+    CHUNK_HASH_MISMATCH,
+    FILE_INCOMPLETE,
+    FILE_SIZE_MISMATCH,
+    FILE_HASH_MISMATCH,
+    TARGET_ALREADY_EXISTS,
+    STORAGE_ERROR
+}
