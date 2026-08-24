@@ -28,9 +28,11 @@ LAN 直传 → P2P 直传 → Server Relay
 - 使用清单和 SHA-256 验证文件完整性
 - 使用 WebSocket 推送任务和进度状态
 
-### Windows 桌面集成
+### Windows 与 Linux 桌面客户端
 
-- 右键菜单发送入口
+- Windows 10 / 11 安装程序、便携版与 Shell MSIX
+- Ubuntu / Debian amd64 原生 DEB 安装包
+- Windows 右键菜单发送入口与 Linux 桌面集成
 - 单实例启动与外部命令转发
 - 本地任务状态持久化
 - 目标设备选择、传输进度与接收通知
@@ -66,6 +68,17 @@ LAN 直传 → P2P 直传 → Server Relay
 |---|---|
 | Server | Maven `1.1.1`，Java 17 / Spring Boot |
 | Web | npm `1.1.1` 的生产构建产物 |
-| Client | CMake project `1.1.1`，Qt 6.8+ / C++17 |
+| Client | CMake project `1.1.1`，Qt 6.8+ / C++17，支持 Windows 与 Linux |
 
 官方服务端和 Web 控制台已核验为 v1.1.1 对应构建。仓库不记录生产凭据、服务器内部路径或其他部署秘密。
+
+## 下载
+
+GitHub Release 提供以下正式构建产物：
+
+- `MyFolder-v1.1.1-Windows-x64-Setup.exe`
+- `MyFolder-v1.1.1-Windows-x64-Portable.zip`
+- `MyFolder-v1.1.1-Windows-x64-Shell.msix`
+- `myfolder-client_1.1.1-25_amd64.deb`
+
+下载地址：<https://github.com/SuoNam/MyFolder/releases/tag/v1.1.1>
