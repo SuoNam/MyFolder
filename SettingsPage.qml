@@ -11,6 +11,12 @@ Item {
     property string displayName: ""
     property string accountMessage: ""
     property var storageUsage: null
+    property bool preferenceBusy: false
+
+    function refreshContent() {
+        HttpHandler.loadAccountProfile()
+        HttpHandler.loadStorageUsage()
+    }
 
     function formatBytes(value) {
         var n = Number(value || 0); var units = ["B", "KiB", "MiB", "GiB", "TiB"]; var i = 0
@@ -18,7 +24,7 @@ Item {
         return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + " " + units[i]
     }
 
-    Component.onCompleted: { HttpHandler.loadAccountProfile(); HttpHandler.loadStorageUsage() }
+    Component.onCompleted: root.refreshContent()
 
     Connections {
         target: HttpHandler
@@ -27,6 +33,7 @@ Item {
                 root.accountName = response.data.account || ""
                 root.accountEmail = response.data.email || ""
                 root.displayName = response.data.displayName || root.accountName
+                GlobalStatus.autoAcceptDeviceTransfers = response.data.autoAcceptDeviceTransfers === true
             } else root.accountMessage = response.message || qsTr("无法读取账号信息")
         }
         function onDisplayNameUpdateResult(response) {
@@ -36,6 +43,15 @@ Item {
             } else root.accountMessage = response.message || qsTr("保存失败")
         }
         function onStorageUsageResult(response) { if (response.status === 200) root.storageUsage = response.data }
+        function onTransferPreferencesUpdateResult(response) {
+            root.preferenceBusy = false
+            if (response.status === 200 && response.data) {
+                GlobalStatus.autoAcceptDeviceTransfers = response.data.autoAcceptDeviceTransfers === true
+                root.accountMessage = qsTr("自动接收设置已保存")
+            } else {
+                root.accountMessage = response.message || qsTr("保存自动接收设置失败")
+            }
+        }
     }
 
     ScrollView {
@@ -78,7 +94,7 @@ Item {
                             }
                             UiButton {
                                 text: qsTr("打开")
-                                onClicked: Qt.openUrlExternally("file:///" + GlobalStatus.dataFolder)
+                                onClicked: ShellIntegration.openFolder(GlobalStatus.dataFolder)
                             }
                         }
                     }
@@ -91,11 +107,23 @@ Item {
                             Layout.fillWidth: true
                             mono: true
                             text: RelayDownloadManager.receiveRoot
-                            onEditingFinished: RelayDownloadManager.receiveRoot = text
+                            onEditingFinished: {
+                                RelayDownloadManager.receiveRoot = text
+                                LanTransferManager.receiveRoot = RelayDownloadManager.receiveRoot
+                                text = RelayDownloadManager.receiveRoot
+                            }
                         }
                         UiButton {
                             text: qsTr("打开文件夹")
-                            onClicked: Qt.openUrlExternally("file:///" + RelayDownloadManager.receiveRoot.replace(/\\/g, "/"))
+                            onClicked: ShellIntegration.openFolder(RelayDownloadManager.receiveRoot)
+                        }
+                        Text {
+                            visible: ShellIntegration.lastError.length > 0
+                            Layout.fillWidth: true
+                            text: ShellIntegration.lastError
+                            color: Theme.alert
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
                         }
                     }
                 }
@@ -120,9 +148,35 @@ Item {
                         animate: false
                         rungs: [
                             {name: "LAN", state: "live", note: qsTr("同一局域网内直传，速度最快")},
-                            {name: "P2P", state: "live", note: qsTr("跨网络点对点直连")},
+                            {name: "P2P", state: "live", note: qsTr("ICE/STUN 打洞，DTLS 加密传输")},
                             {name: "RELAY", state: "live", note: qsTr("服务器中转兜底")}
                         ]
+                    }
+                }
+            }
+
+            SettingsCard {
+                title: qsTr("接收文件")
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    RowLayout {
+                        Layout.fillWidth: true
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 3
+                            Text { text: qsTr("自动接收其他设备的文件"); font.pixelSize: 12; font.weight: Font.Medium; color: Theme.ink2 }
+                            Text { text: qsTr("此设置跟随账号，并同步到所有桌面客户端"); font.pixelSize: 10; color: Theme.muted }
+                        }
+                        Switch {
+                            checked: GlobalStatus.autoAcceptDeviceTransfers
+                            enabled: !root.preferenceBusy
+                            Accessible.name: qsTr("自动接收其他设备的文件")
+                            onToggled: {
+                                root.preferenceBusy = true
+                                HttpHandler.updateTransferPreferences(checked)
+                            }
+                        }
                     }
                 }
             }

@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications || true
+fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+fi
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+    kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
+fi
+
+# Keep the LAN receiver reachable without exposing it beyond private IPv4 ranges.
+if command -v ufw >/dev/null 2>&1; then
+    ufw allow proto tcp from 10.0.0.0/8 to any port 45897 comment 'MyFolder LAN Receiver' >/dev/null || true
+    ufw allow proto tcp from 172.16.0.0/12 to any port 45897 comment 'MyFolder LAN Receiver' >/dev/null || true
+    ufw allow proto tcp from 192.168.0.0/16 to any port 45897 comment 'MyFolder LAN Receiver' >/dev/null || true
+fi
+
+exit 0

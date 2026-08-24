@@ -42,6 +42,8 @@ signals:
                               const QJsonObject &payload);
     void protocolError(const QString &message);
     void reconnectExhausted();
+    void deviceCredentialsRejected();
+    void authenticationRequired();
 
 private slots:
     void openSocket();
@@ -52,12 +54,15 @@ private slots:
 
 private:
     void scheduleReconnect();
+    void failCurrentConnection(const QString &error);
     void setConnectionState(const QString &state);
     void setLastError(const QString &error);
     static QString websocketUrl(const QString &baseUrl, const QString &deviceId);
 
     QWebSocket m_webSocket;
     QTimer m_heartbeatTimer;
+    QTimer m_heartbeatAckTimer;
+    QTimer m_connectTimer;
     QTimer m_reconnectTimer;
     QString m_baseUrl;
     QString m_authToken;

@@ -4,5 +4,3 @@
 FileDownloader::FileDownloader(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
 }
-
-

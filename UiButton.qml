@@ -4,7 +4,7 @@ import QtQuick.Controls
 // Primary / secondary / quiet / danger button, sized for the compact client UI.
 Button {
     id: root
-    property string kind: "secondary"   // primary | secondary | quiet | danger
+    property string kind: "secondary"   // primary | secondary | quiet | danger | dangerPrimary
     property int pixelSize: 12
 
     implicitHeight: 32
@@ -19,6 +19,7 @@ Button {
         color: {
             if (!root.enabled) return Theme.sunken
             if (root.kind === "primary") return root.hovered ? Theme.signalDeep : Theme.signal
+            if (root.kind === "dangerPrimary") return root.hovered ? "#91352F" : Theme.alert
             if (root.kind === "danger")  return root.hovered ? Theme.alertWash : Theme.surface
             if (root.kind === "quiet")   return "transparent"
             return root.hovered ? Theme.sunken : Theme.surface
@@ -27,6 +28,7 @@ Button {
         border.color: {
             if (!root.enabled) return Theme.lineSoft
             if (root.kind === "primary") return root.hovered ? Theme.signalDeep : Theme.signal
+            if (root.kind === "dangerPrimary") return root.hovered ? "#91352F" : Theme.alert
             if (root.kind === "danger")  return root.hovered ? Theme.alertEdge : Theme.line
             return root.hovered ? "#CBD8D1" : Theme.line
         }
@@ -37,7 +39,7 @@ Button {
         font: root.font
         color: {
             if (!root.enabled) return Theme.faint
-            if (root.kind === "primary") return "#FFFFFF"
+            if (root.kind === "primary" || root.kind === "dangerPrimary") return "#FFFFFF"
             if (root.kind === "danger")  return Theme.alert
             if (root.kind === "quiet" && root.hovered) return Theme.signalDeep
             return Theme.ink2

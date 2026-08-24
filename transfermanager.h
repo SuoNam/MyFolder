@@ -30,6 +30,7 @@
 
 struct TransferFileItem {
     QString path;              // Relative UTF-8 path using '/' (e.g., "docs/a.txt")
+    QString localPath;         // Exact source path for a multi-file selection
     qint64 size = 0;           // File size in bytes
     QString sha256;            // Whole file 64-char hex SHA-256
     int totalChunks = 0;       // ceil(size / chunkSize)
@@ -52,11 +53,14 @@ struct TransferTaskGroup {
     QString parentPath;        // Server parent path (default "inbox")
     QString targetPath;        // Exact v1.1.1 server destination root
     QString serverBaseUrl;     // Persisted endpoint used by this task
+    QString scopeType = "PRIVATE"; // PRIVATE or GROUP
+    QString scopeId;           // Group id for GROUP uploads
     qint64 chunkSize = 4LL * 1024 * 1024; // v1.1.1 default: 4 MiB
     int totalFiles = 0;
     qint64 totalBytes = 0;
     qint64 uploadedBytes = 0;
     QString state;             // PENDING, UPLOADING, VERIFYING, COMPLETED, FAILED, CANCELLED
+    QString failureReason;     // Human-readable last failure for the whole task
 
     bool statusSyncedWithServer = false; // Must be true before uploading chunks
     bool isSyncingStatus = false;
@@ -95,11 +99,20 @@ public:
 
     // QML Invokable APIs (myfolder-transfer v1.0.0 compliant)
     Q_INVOKABLE QString startFileUpload(const QString &localFilePath, const QString &parentPath = "inbox");
+    Q_INVOKABLE QString startScopedFileUpload(const QString &localFilePath, const QString &parentPath,
+                                              const QString &scopeType, const QString &scopeId);
+    Q_INVOKABLE QString startScopedFilesUpload(const QVariantList &localFilePaths,
+                                               const QString &parentPath,
+                                               const QString &scopeType,
+                                               const QString &scopeId);
     Q_INVOKABLE QString startFolderUpload(const QString &localFolderPath, const QString &parentPath = "inbox");
+    Q_INVOKABLE QString startScopedFolderUpload(const QString &localFolderPath, const QString &parentPath,
+                                                const QString &scopeType, const QString &scopeId);
     Q_INVOKABLE void queryTaskStatus(const QString &uploadId);
     Q_INVOKABLE void pauseTask(const QString &uploadId);
     Q_INVOKABLE void resumeTask(const QString &uploadId);
     Q_INVOKABLE void cancelTask(const QString &uploadId);
+    Q_INVOKABLE void dismissFailedTask(const QString &uploadId);
     Q_INVOKABLE void retryTask(const QString &uploadId);
     Q_INVOKABLE void clearCompletedTasks();
 
@@ -121,6 +134,7 @@ signals:
     void taskProgressUpdated(const QString &uploadId, qint64 uploaded, qint64 total, double speedMbps);
     void taskStatusChanged(const QString &uploadId, const QString &status, const QString &errorMsg);
     void taskIdChanged(const QString &temporaryId, const QString &uploadId);
+    void authenticationRequired();
 
 private slots:
     void processNextChunk();
@@ -135,9 +149,12 @@ private:
     void saveTasksToStorage();
     void loadTasksFromStorage();
     void updateSpeedStats();
+    void resetNetworkConnectionPool();
 
     QString getStorageFilePath() const;
     void handleServerError(const QJsonObject &errorJson, const QString &uploadId, int httpStatus, int fileIndex = -1, int chunkIndex = -1);
+    QJsonObject responseError(QNetworkReply *reply, const QByteArray &payload, const QString &phase) const;
+    void restartTaskWithNewServerSession(const QString &uploadId);
     void applyRequestDefaults(QNetworkRequest &request) const;
     void recalculateProgress(TransferTaskGroup &group) const;
     bool applyServerTaskResponse(TransferTaskGroup &group, const QJsonObject &response,

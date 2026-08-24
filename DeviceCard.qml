@@ -16,15 +16,8 @@ Rectangle {
     readonly property bool online: isSelf ? WebSocketClient.connected : device.online === true
     readonly property bool isWeb: String(device.deviceType || "").toUpperCase() === "WEB"
     readonly property bool canReceive: !isSelf && !isWeb
-    // Route plan for this peer, judged from its address: RFC1918 → assume same
-    // LAN and try direct first; public address → hole-punch P2P; offline → RELAY.
-    // The transfer layer still probes in LAN → P2P → RELAY order at send time.
-    readonly property bool lanLikely: {
-        var addr = String(device.deviceAddress || "")
-        return addr.indexOf("192.168.") === 0 || addr.indexOf("10.") === 0
-            || /^172\.(1[6-9]|2[0-9]|3[01])\./.test(addr)
-    }
-    readonly property string plannedChannel: !online ? "RELAY" : lanLikely ? "LAN" : "P2P"
+    readonly property bool lanLikely: DeviceManager.reachableLanAddress(device.localAddresses || []).length > 0
+    readonly property string plannedChannel: online && lanLikely ? "LAN" : online ? "P2P" : "RELAY"
 
     radius: Theme.radius
     color: online ? Theme.surface : Theme.sunken
@@ -152,7 +145,7 @@ Rectangle {
                 Text {
                     text: root.isWeb ? qsTr("仅用于管理")
                         : !root.online ? qsTr("先存服务器")
-                        : root.plannedChannel === "LAN" ? qsTr("走局域网直传") : qsTr("走 P2P 直连")
+                        : root.plannedChannel === "LAN" ? qsTr("走局域网直传") : qsTr("尝试 P2P 直传")
                     font.family: Theme.dataFont
                     font.pixelSize: 11
                     color: Theme.ink2
@@ -168,11 +161,11 @@ Rectangle {
                        {name: "RELAY", state: "live", note: qsTr("文件先存服务器，上线自动下载")}]
                     : root.plannedChannel === "LAN"
                     ? [{name: "LAN",   state: "live", note: qsTr("同网段可直连")},
-                       {name: "P2P",   state: "wait", note: qsTr("无需尝试")},
-                       {name: "RELAY", state: "wait", note: qsTr("无需尝试")}]
+                       {name: "P2P",   state: "wait", note: qsTr("LAN 失败后尝试")},
+                       {name: "RELAY", state: "wait", note: qsTr("直连失败时自动使用")}]
                     : [{name: "LAN",   state: "out",  note: qsTr("不在同一网段")},
-                       {name: "P2P",   state: "live", note: qsTr("尝试打洞直连")},
-                       {name: "RELAY", state: "wait", note: qsTr("备用通道")}]
+                       {name: "P2P",   state: "live", note: qsTr("通过 ICE/STUN 尝试打洞")},
+                       {name: "RELAY", state: "wait", note: qsTr("打洞失败时自动使用")}]
             }
             Text {
                 visible: root.isWeb

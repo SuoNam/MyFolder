@@ -8,11 +8,77 @@ Rectangle {
     signal cancelRequested()
     signal retryRequested()
     signal acceptRequested()
+    signal rejectRequested()
+    signal dismissRequested()
 
     readonly property bool done: task.state === "COMPLETED"
     readonly property bool failed: task.state === "FAILED"
     readonly property bool offered: task.state === "OFFERED"
     readonly property bool serverUpload: task.serverUpload === true
+    property string sampledTaskKey: ""
+    property double sampledBytes: 0
+    property double sampledAtMs: 0
+    property double bytesPerSecond: 0
+
+    function taskKey() {
+        return String(task.forwardId || task.uploadId || task.title || "")
+    }
+
+    function currentBytes() {
+        return Math.max(0, Number(task.transferredBytes || 0))
+    }
+
+    function formatRate(value) {
+        if (!isFinite(value) || value <= 0)
+            return qsTr("测速中…")
+        return Theme.formatBytes(value) + "/s"
+    }
+
+    function formatEta(value) {
+        if (!isFinite(value) || value <= 0)
+            return ""
+        var seconds = Math.ceil(value)
+        if (seconds < 60)
+            return qsTr("约 %1 秒").arg(seconds)
+        if (seconds < 3600)
+            return qsTr("约 %1 分 %2 秒").arg(Math.floor(seconds / 60)).arg(seconds % 60)
+        return qsTr("约 %1 小时 %2 分").arg(Math.floor(seconds / 3600)).arg(Math.floor((seconds % 3600) / 60))
+    }
+
+    function resetSpeedSample() {
+        sampledTaskKey = taskKey()
+        sampledBytes = currentBytes()
+        sampledAtMs = Date.now()
+        bytesPerSecond = 0
+    }
+
+    onTaskChanged: {
+        if (taskKey() !== sampledTaskKey)
+            resetSpeedSample()
+    }
+
+    Component.onCompleted: resetSpeedSample()
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: root.visible && !root.done && !root.failed && !root.offered
+        onTriggered: {
+            var now = Date.now()
+            var current = root.currentBytes()
+            var elapsed = now - root.sampledAtMs
+            if (elapsed > 0 && current >= root.sampledBytes) {
+                var instant = (current - root.sampledBytes) * 1000 / elapsed
+                root.bytesPerSecond = root.bytesPerSecond > 0
+                        ? root.bytesPerSecond * 0.55 + instant * 0.45
+                        : instant
+            } else if (current < root.sampledBytes) {
+                root.bytesPerSecond = 0
+            }
+            root.sampledBytes = current
+            root.sampledAtMs = now
+        }
+    }
 
     color: "transparent"
     implicitHeight: body.implicitHeight + 24
@@ -67,6 +133,18 @@ Rectangle {
                     color: root.failed ? Theme.alert : Theme.muted
                     elide: Text.ElideRight
                 }
+                Text {
+                    visible: String(root.task.statusText || root.task.failureReason || "").length > 0
+                    Layout.fillWidth: true
+                    text: root.failed
+                          ? String(root.task.failureReason || root.task.statusText || "")
+                          : String(root.task.statusText || "")
+                    font.pixelSize: 10
+                    color: root.failed ? Theme.alert : Theme.faint
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: root.failed ? 3 : 1
+                    elide: Text.ElideRight
+                }
             }
 
             ColumnLayout {
@@ -74,7 +152,7 @@ Rectangle {
                 visible: !root.done && !root.failed && !root.offered
                 Text {
                     Layout.alignment: Qt.AlignRight
-                    text: root.task.rate || ""
+                    text: root.task.rate || root.formatRate(root.bytesPerSecond)
                     font.family: Theme.dataFont
                     font.pixelSize: 13
                     font.weight: Font.Medium
@@ -82,7 +160,8 @@ Rectangle {
                 }
                 Text {
                     Layout.alignment: Qt.AlignRight
-                    text: root.task.eta || ""
+                    text: root.task.eta || root.formatEta((Number(root.task.totalBytes || 0)
+                                                          - root.currentBytes()) / root.bytesPerSecond)
                     font.family: Theme.dataFont
                     font.pixelSize: 10
                     color: Theme.faint
@@ -90,8 +169,11 @@ Rectangle {
             }
 
             UiChip { visible: root.done; channel: root.task.channel || "LAN"; text: root.serverUpload ? qsTr("已上传") : (root.task.channel || "LAN") }
-            UiButton { visible: root.offered; kind: "primary"; implicitHeight: 26; text: qsTr("接收"); onClicked: root.acceptRequested() }
-            UiButton { visible: root.failed; implicitHeight: 26; text: qsTr("重试"); onClicked: root.retryRequested() }
+            UiChip { visible: root.offered && root.task.incoming && root.task.automaticAcceptance === true; channel: root.task.channel || "LAN"; text: qsTr("自动切换") }
+            UiButton { visible: root.offered && root.task.incoming && root.task.automaticAcceptance !== true; kind: "danger"; implicitHeight: 26; text: qsTr("拒绝"); onClicked: root.rejectRequested() }
+            UiButton { visible: root.offered && root.task.incoming && root.task.automaticAcceptance !== true; kind: "primary"; implicitHeight: 26; text: qsTr("接收"); onClicked: root.acceptRequested() }
+            UiButton { visible: root.failed && root.task.canRetry !== false; implicitHeight: 26; text: qsTr("重试"); onClicked: root.retryRequested() }
+            UiButton { visible: root.failed; kind: "quiet"; implicitHeight: 26; text: qsTr("移除"); onClicked: root.dismissRequested() }
         }
 
         RowLayout {

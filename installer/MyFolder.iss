@@ -48,6 +48,8 @@ Root: HKCU; Subkey: "Software\Classes\*\shell\MyFolderUpload"; Flags: deletekey
 Root: HKCU; Subkey: "Software\Classes\*\shell\MyFolderSend"; Flags: deletekey
 
 [Run]
+Filename: "netsh.exe"; Parameters: "advfirewall firewall delete rule name=""MyFolder LAN Receiver"""; Flags: runhidden waituntilterminated
+Filename: "netsh.exe"; Parameters: "advfirewall firewall add rule name=""MyFolder LAN Receiver"" dir=in action=allow program=""{app}\{#AppExeName}"" enable=yes profile=private protocol=TCP"; Flags: runhidden waituntilterminated
 Filename: "certutil.exe"; Parameters: "-addstore TrustedPeople ""{app}\MyFolderShell.cer"""; Flags: runhidden waituntilterminated
 Filename: "certutil.exe"; Parameters: "-addstore Root ""{app}\MyFolderShell.cer"""; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Get-AppxPackage -Name 'MyFolder.Desktop' | Remove-AppxPackage -ErrorAction SilentlyContinue"""; Flags: runhidden waituntilterminated
@@ -55,6 +57,7 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Com
 Filename: "{app}\{#AppExeName}"; Description: "启动 MyFolder"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
+Filename: "netsh.exe"; Parameters: "advfirewall firewall delete rule name=""MyFolder LAN Receiver"""; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Get-AppxPackage -Name 'MyFolder.Desktop' | Remove-AppxPackage -ErrorAction SilentlyContinue"""; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$t=Get-Content -LiteralPath '{app}\MyFolderShell.thumbprint' -ErrorAction SilentlyContinue; if($t){{Remove-Item -LiteralPath ('Cert:\LocalMachine\TrustedPeople\'+$t) -Force -ErrorAction SilentlyContinue}}"""; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$t=Get-Content -LiteralPath '{app}\MyFolderShell.thumbprint' -ErrorAction SilentlyContinue; if($t){{Remove-Item -LiteralPath ('Cert:\LocalMachine\Root\'+$t) -Force -ErrorAction SilentlyContinue}}"""; Flags: runhidden waituntilterminated

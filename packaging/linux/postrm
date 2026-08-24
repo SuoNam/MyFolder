@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove|purge)
+        if command -v ufw >/dev/null 2>&1; then
+            ufw --force delete allow proto tcp from 10.0.0.0/8 to any port 45897 comment 'MyFolder LAN Receiver' >/dev/null 2>&1 || true
+            ufw --force delete allow proto tcp from 172.16.0.0/12 to any port 45897 comment 'MyFolder LAN Receiver' >/dev/null 2>&1 || true
+            ufw --force delete allow proto tcp from 192.168.0.0/16 to any port 45897 comment 'MyFolder LAN Receiver' >/dev/null 2>&1 || true
+        fi
+        if command -v kbuildsycoca6 >/dev/null 2>&1; then
+            kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+        elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+            kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
+        fi
+        ;;
+esac
+
+exit 0

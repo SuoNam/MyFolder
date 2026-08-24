@@ -55,10 +55,11 @@ void TransferManager::setAuthToken(const QString &token)
         if (!m_authToken.isEmpty()) {
             for (auto it = m_tasks.begin(); it != m_tasks.end(); ++it) {
                 if (!it.value().pausedByUser && it.value().state != "COMPLETED" &&
-                    it.value().state != "CANCELLED") {
+                    it.value().state != "CANCELLED" && it.value().state != "FAILED") {
                     QString sourceError;
                     if (!validateLocalSources(it.value(), &sourceError)) {
                         it.value().state = "FAILED";
+                        it.value().failureReason = sourceError;
                         it.value().pausedByUser = true;
                         emit taskStatusChanged(it.key(), "FAILED", sourceError);
                         continue;
@@ -192,6 +193,11 @@ void TransferManager::applyRequestDefaults(QNetworkRequest &request) const
     }
 }
 
+void TransferManager::resetNetworkConnectionPool()
+{
+    if (m_netManager) m_netManager->clearConnectionCache();
+}
+
 void TransferManager::recalculateProgress(TransferTaskGroup &group) const
 {
     group.uploadedBytes = 0;
@@ -292,6 +298,15 @@ bool TransferManager::applyServerTaskResponse(TransferTaskGroup &group,
     }
 
     group.state = state;
+    group.failureReason = response.value("failureReason").toString();
+    if (group.failureReason.isEmpty()) {
+        for (const TransferFileItem &file : group.files) {
+            if (!file.failureReason.isEmpty()) {
+                group.failureReason = file.failureReason;
+                break;
+            }
+        }
+    }
     recalculateProgress(group);
     return true;
 }
@@ -327,9 +342,10 @@ bool TransferManager::validateLocalSources(TransferTaskGroup &group, QString *er
 {
     const bool rootIsDirectory = QFileInfo(group.localRootPath).isDir();
     for (TransferFileItem &file : group.files) {
-        const QString localPath = rootIsDirectory
-            ? QDir(group.localRootPath).filePath(file.path)
-            : group.localRootPath;
+        const QString localPath = !file.localPath.isEmpty()
+            ? file.localPath
+            : (rootIsDirectory ? QDir(group.localRootPath).filePath(file.path)
+                               : group.localRootPath);
         const QFileInfo info(localPath);
         if (!info.exists() || !info.isFile() || info.size() != file.size ||
             calculateFileHash(localPath) != file.sha256) {
@@ -359,9 +375,20 @@ QVariantList TransferManager::getTaskList() const
         map["totalBytes"] = group.totalBytes;
         map["uploadedBytes"] = group.uploadedBytes;
         map["state"] = group.state;
+        map["failureReason"] = group.failureReason;
+        QString statusText;
+        if (group.state == "FAILED") statusText = group.failureReason;
+        else if (group.state == "VERIFYING" || group.completionInFlight) statusText = tr("正在服务器校验并合并");
+        else if (group.creationInFlight || group.uploadId.startsWith("temp_")) statusText = tr("正在创建上传任务");
+        else if (group.isSyncingStatus) statusText = tr("正在同步服务器进度");
+        else if (group.pausedByUser) statusText = tr("已暂停");
+        else statusText = tr("正在上传");
+        map["statusText"] = statusText;
 
         double progress = (group.totalBytes > 0) ? static_cast<double>(group.uploadedBytes) / group.totalBytes : 0.0;
-        map["progress"] = qBound(0.0, progress, 1.0);
+        progress = qBound(0.0, progress, 1.0);
+        if (group.state != "COMPLETED" && progress >= 1.0) progress = 0.99;
+        map["progress"] = progress;
 
         QVariantList filesList;
         for (const TransferFileItem &f : group.files) {
@@ -373,6 +400,7 @@ QVariantList TransferManager::getTaskList() const
             fMap["state"] = f.state;
             fMap["uploadedBytes"] = f.uploadedBytes;
             fMap["missingChunksCount"] = f.missingChunks.size();
+            fMap["failureReason"] = f.failureReason;
             double fProg = (f.size > 0) ? static_cast<double>(f.uploadedBytes) / f.size : 0.0;
             fMap["progress"] = qBound(0.0, fProg, 1.0);
             filesList.append(fMap);
@@ -386,57 +414,105 @@ QVariantList TransferManager::getTaskList() const
 
 QString TransferManager::startFileUpload(const QString &localFilePath, const QString &parentPath)
 {
-    QString cleanPath = localFilePath;
-#ifdef Q_OS_WIN
-    if (cleanPath.startsWith("file:///")) {
-        cleanPath.remove(0, 8);
-    } else if (cleanPath.startsWith("file://")) {
-        cleanPath.remove(0, 7);
-    }
-#endif
-    QFileInfo fi(cleanPath);
-    if (!fi.exists() || !fi.isFile()) {
-        qWarning() << "File does not exist:" << cleanPath;
+    return startScopedFileUpload(localFilePath, parentPath, "PRIVATE", QString());
+}
+
+QString TransferManager::startScopedFileUpload(const QString &localFilePath, const QString &parentPath,
+                                               const QString &scopeType, const QString &scopeId)
+{
+    return startScopedFilesUpload(QVariantList{localFilePath}, parentPath, scopeType, scopeId);
+}
+
+QString TransferManager::startScopedFilesUpload(const QVariantList &localFilePaths,
+                                                const QString &parentPath,
+                                                const QString &scopeType,
+                                                const QString &scopeId)
+{
+    if (localFilePaths.isEmpty() || localFilePaths.size() > 1000) {
+        qWarning() << "Invalid file selection count:" << localFilePaths.size();
         return QString();
     }
 
+    QStringList cleanPaths;
+    for (const QVariant &value : localFilePaths) {
+        const QString rawPath = value.toString().trimmed();
+        const QUrl localUrl(rawPath);
+        const QString cleanPath = QFileInfo(localUrl.isLocalFile()
+                                                ? localUrl.toLocalFile() : rawPath).absoluteFilePath();
+        const QFileInfo info(cleanPath);
+        if (!info.exists() || !info.isFile()) {
+            qWarning() << "Selected file does not exist:" << cleanPath;
+            return QString();
+        }
+        bool duplicate = false;
+        for (const QString &existing : cleanPaths) {
+            if (existing.compare(cleanPath, Qt::CaseInsensitive) == 0) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate) cleanPaths.append(cleanPath);
+    }
+    if (cleanPaths.isEmpty()) return QString();
+
     TransferTaskGroup group;
     group.uploadId = "temp_" + QUuid::createUuid().toString(QUuid::WithoutBraces);
-    group.localRootPath = fi.absoluteFilePath();
-    group.parentPath = normalizedParentPath(parentPath);
+    group.localRootPath = cleanPaths.size() == 1
+        ? cleanPaths.constFirst() : QFileInfo(cleanPaths.constFirst()).absolutePath();
+    group.scopeType = scopeType.trimmed().toUpper() == "GROUP" ? "GROUP" : "PRIVATE";
+    group.scopeId = group.scopeType == "GROUP" ? scopeId.trimmed() : QString();
+    QString scopedParent = parentPath.trimmed();
+    while (scopedParent.startsWith('/')) scopedParent.remove(0, 1);
+    while (scopedParent.endsWith('/')) scopedParent.chop(1);
+    if (!scopedParent.isEmpty() && !isValidProtocolPath(scopedParent)) {
+        qWarning() << "Invalid scoped upload path:" << parentPath;
+        return QString();
+    }
+    group.parentPath = scopedParent;
     group.directoryName = group.parentPath == "relay"
                               ? "pc-" + group.uploadId.mid(5)
-                              : fi.fileName();
+                              : (cleanPaths.size() == 1
+                                     ? QFileInfo(cleanPaths.constFirst()).fileName()
+                                     : tr("%1 个文件").arg(cleanPaths.size()));
     group.targetPath = group.parentPath == "relay"
                            ? group.parentPath + "/" + group.directoryName
                            : group.parentPath;
     group.serverBaseUrl = m_baseUrl;
-    if (!isValidProtocolPath(group.directoryName) ||
-        !isValidProtocolPath(fi.fileName())) {
-        qWarning() << "Invalid protocol path for upload:" << parentPath << fi.fileName();
+    if (group.scopeType == "GROUP" && group.scopeId.isEmpty()) {
+        qWarning() << "Missing group id for scoped upload";
         return QString();
     }
     group.chunkSize = DEFAULT_CHUNK_SIZE;
     group.state = "PENDING";
     group.statusSyncedWithServer = true;
 
-    TransferFileItem item;
-    item.path = fi.fileName();
-    item.size = fi.size();
-    item.sha256 = calculateFileHash(cleanPath);
-    if (item.sha256.isEmpty()) {
-        return QString();
-    }
-    item.totalChunks = item.size == 0 ? 0
-                                     : static_cast<int>((item.size + group.chunkSize - 1) / group.chunkSize);
-    item.state = "PENDING";
-    for (int i = 0; i < item.totalChunks; ++i) {
-        item.missingChunks.append(i);
-    }
+    QSet<QString> serverPaths;
+    for (const QString &cleanPath : cleanPaths) {
+        const QFileInfo info(cleanPath);
+        const QString serverPath = info.fileName();
+        const QString foldedPath = serverPath.toCaseFolded();
+        if (!isValidProtocolPath(serverPath) || serverPaths.contains(foldedPath)) {
+            qWarning() << "Duplicate or invalid selected file name:" << serverPath;
+            return QString();
+        }
+        serverPaths.insert(foldedPath);
 
-    group.files.append(item);
-    group.totalFiles = 1;
-    group.totalBytes = item.size;
+        TransferFileItem item;
+        item.path = serverPath;
+        item.localPath = info.absoluteFilePath();
+        item.size = info.size();
+        item.sha256 = calculateFileHash(item.localPath);
+        if (item.sha256.isEmpty()) return QString();
+        item.totalChunks = item.size == 0 ? 0
+                                         : static_cast<int>((item.size + group.chunkSize - 1)
+                                                            / group.chunkSize);
+        item.state = "PENDING";
+        for (int index = 0; index < item.totalChunks; ++index)
+            item.missingChunks.append(index);
+        group.files.append(item);
+        group.totalBytes += item.size;
+    }
+    group.totalFiles = group.files.size();
 
     m_tasks[group.uploadId] = group;
     m_activeQueue.append(group.uploadId);
@@ -452,14 +528,14 @@ QString TransferManager::startFileUpload(const QString &localFilePath, const QSt
 
 QString TransferManager::startFolderUpload(const QString &localFolderPath, const QString &parentPath)
 {
-    QString cleanPath = localFolderPath;
-#ifdef Q_OS_WIN
-    if (cleanPath.startsWith("file:///")) {
-        cleanPath.remove(0, 8);
-    } else if (cleanPath.startsWith("file://")) {
-        cleanPath.remove(0, 7);
-    }
-#endif
+    return startScopedFolderUpload(localFolderPath, parentPath, "PRIVATE", QString());
+}
+
+QString TransferManager::startScopedFolderUpload(const QString &localFolderPath, const QString &parentPath,
+                                                 const QString &scopeType, const QString &scopeId)
+{
+    const QUrl localUrl(localFolderPath);
+    const QString cleanPath = localUrl.isLocalFile() ? localUrl.toLocalFile() : localFolderPath;
     QDir folderDir(cleanPath);
     if (!folderDir.exists()) {
         qWarning() << "Folder does not exist:" << cleanPath;
@@ -469,13 +545,23 @@ QString TransferManager::startFolderUpload(const QString &localFolderPath, const
     TransferTaskGroup group;
     group.uploadId = "temp_" + QUuid::createUuid().toString(QUuid::WithoutBraces);
     group.localRootPath = cleanPath;
-    group.parentPath = normalizedParentPath(parentPath);
+    group.scopeType = scopeType.trimmed().toUpper() == "GROUP" ? "GROUP" : "PRIVATE";
+    group.scopeId = group.scopeType == "GROUP" ? scopeId.trimmed() : QString();
+    QString scopedParent = parentPath.trimmed();
+    while (scopedParent.startsWith('/')) scopedParent.remove(0, 1);
+    while (scopedParent.endsWith('/')) scopedParent.chop(1);
+    if (!scopedParent.isEmpty() && !isValidProtocolPath(scopedParent)) {
+        qWarning() << "Invalid scoped folder upload path:" << parentPath;
+        return QString();
+    }
+    group.parentPath = scopedParent;
     group.directoryName = group.parentPath == "relay"
                               ? "pc-" + group.uploadId.mid(5)
                               : folderDir.dirName();
     group.targetPath = group.parentPath + "/" + group.directoryName;
     group.serverBaseUrl = m_baseUrl;
-    if (group.parentPath.isEmpty() || !isValidProtocolPath(group.directoryName)) {
+    if ((group.scopeType == "GROUP" && group.scopeId.isEmpty())
+        || !isValidProtocolPath(group.directoryName)) {
         qWarning() << "Invalid protocol path for folder upload:" << parentPath << group.directoryName;
         return QString();
     }
@@ -539,6 +625,8 @@ void TransferManager::createServerTask(TransferTaskGroup &group)
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=utf-8");
 
     QJsonObject json;
+    json["scopeType"] = group.scopeType;
+    json["scopeId"] = group.scopeType == "GROUP" ? QJsonValue(group.scopeId) : QJsonValue(QJsonValue::Null);
     json["targetPath"] = group.targetPath;
     json["chunkSize"] = group.chunkSize;
     json["totalFiles"] = group.totalFiles;
@@ -587,6 +675,7 @@ void TransferManager::createServerTask(TransferTaskGroup &group)
             QString responseError;
             if (!applyServerTaskResponse(group, respJson, &responseError)) {
                 group.state = "FAILED";
+                group.failureReason = responseError;
                 group.pausedByUser = true;
                 m_tasks[serverUploadId] = group;
                 saveTasksToStorage();
@@ -596,6 +685,7 @@ void TransferManager::createServerTask(TransferTaskGroup &group)
                 return;
             }
             group.statusSyncedWithServer = true;
+            group.failureReason.clear();
             group.retryCount = 0;
             group.nextRetryTimeMs = 0;
 
@@ -607,7 +697,7 @@ void TransferManager::createServerTask(TransferTaskGroup &group)
             emit taskIdChanged(oldId, serverUploadId);
             emit taskStatusChanged(serverUploadId, group.state, "");
         } else {
-            QJsonObject errJson = QJsonDocument::fromJson(respBytes).object();
+            QJsonObject errJson = responseError(reply, respBytes, tr("创建上传任务"));
             const QString code = errJson.value("code").toString();
             if (isRetryableError(code, status)) {
                 pendingGroup.retryCount++;
@@ -616,6 +706,7 @@ void TransferManager::createServerTask(TransferTaskGroup &group)
                                                    calculateBackoffDelayMs(pendingGroup.retryCount);
                     pendingGroup.state = "PENDING";
                     if (status == 0) {
+                        resetNetworkConnectionPool();
                         m_isNetworkAvailable = false;
                         emit networkStatusChanged(false);
                     }
@@ -723,8 +814,8 @@ void TransferManager::uploadChunk(TransferTaskGroup &group, int fileIndex, int c
     m_isUploadingChunk = true;
     TransferFileItem &file = group.files[fileIndex];
 
-    QString localPath = group.localRootPath;
-    if (QFileInfo(group.localRootPath).isDir()) {
+    QString localPath = file.localPath.isEmpty() ? group.localRootPath : file.localPath;
+    if (file.localPath.isEmpty() && QFileInfo(group.localRootPath).isDir()) {
         localPath = QDir(group.localRootPath).filePath(file.path);
     }
 
@@ -738,7 +829,12 @@ void TransferManager::uploadChunk(TransferTaskGroup &group, int fileIndex, int c
     if (!fileObj.open(QIODevice::ReadOnly) || !fileObj.seek(start)) {
         m_isUploadingChunk = false;
         file.state = "FAILED";
-        file.failureReason = "Local file read failed";
+        file.failureReason = tr("无法读取本地文件");
+        group.failureReason = file.failureReason;
+        group.state = "FAILED";
+        group.pausedByUser = true;
+        saveTasksToStorage();
+        emit taskStatusChanged(group.uploadId, "FAILED", file.failureReason);
         emit taskListChanged();
         return;
     }
@@ -747,7 +843,8 @@ void TransferManager::uploadChunk(TransferTaskGroup &group, int fileIndex, int c
     if (chunkHash.isEmpty() || chunkData.size() != chunkSize) {
         m_isUploadingChunk = false;
         file.state = "FAILED";
-        file.failureReason = "Local file changed or could not be read completely";
+        file.failureReason = tr("本地文件已变更或无法完整读取");
+        group.failureReason = file.failureReason;
         group.state = "FAILED";
         group.pausedByUser = true;
         saveTasksToStorage();
@@ -802,7 +899,7 @@ void TransferManager::uploadChunk(TransferTaskGroup &group, int fileIndex, int c
             saveTasksToStorage();
             emit taskListChanged();
         } else {
-            QJsonObject errJson = QJsonDocument::fromJson(respBytes).object();
+            QJsonObject errJson = responseError(reply, respBytes, tr("上传分片 %1").arg(chunkIndex + 1));
             QString errCode = errJson.value("code").toString();
 
             TransferFileItem &f = grp.files[fileIndex];
@@ -814,13 +911,16 @@ void TransferManager::uploadChunk(TransferTaskGroup &group, int fileIndex, int c
                 f.state = "UPLOADING";
                 grp.state = "UPLOADING";
                 if (status == 0) {
+                    resetNetworkConnectionPool();
                     m_isNetworkAvailable = false;
                     emit networkStatusChanged(false);
                 }
                 qWarning() << "Chunk upload retry" << f.retryCount << "for index" << chunkIndex << "after" << backoffMs << "ms, error:" << errCode;
             } else if (isRetryableError(errCode, status)) {
                 f.state = "FAILED";
-                f.failureReason = QString("Failed after %1 retries: %2").arg(MAX_RETRIES).arg(errCode);
+                f.failureReason = errJson.value("message").toString();
+                if (f.failureReason.isEmpty()) f.failureReason = tr("分片上传重试 %1 次后仍失败").arg(MAX_RETRIES);
+                grp.failureReason = f.failureReason;
                 grp.state = "FAILED";
                 grp.pausedByUser = true;
                 emit taskStatusChanged(uploadId, "FAILED", f.failureReason);
@@ -873,7 +973,7 @@ void TransferManager::completeSingleFile(TransferTaskGroup &group, int fileIndex
             saveTasksToStorage();
             emit taskListChanged();
         } else {
-            QJsonObject errJson = QJsonDocument::fromJson(respBytes).object();
+            QJsonObject errJson = responseError(reply, respBytes, tr("服务器校验文件"));
             QString errCode = errJson.value("code").toString();
 
             if (errCode == "FILE_INCOMPLETE") {
@@ -888,6 +988,7 @@ void TransferManager::completeSingleFile(TransferTaskGroup &group, int fileIndex
                 QString sourceError;
                 if (!validateLocalSources(grp, &sourceError)) {
                     grp.state = "FAILED";
+                    grp.failureReason = sourceError;
                     grp.pausedByUser = true;
                     emit taskStatusChanged(uploadId, "FAILED", sourceError);
                 } else {
@@ -906,6 +1007,7 @@ void TransferManager::completeSingleFile(TransferTaskGroup &group, int fileIndex
                     f.nextRetryTimeMs = QDateTime::currentMSecsSinceEpoch() + backoffMs;
                     f.state = "UPLOADING";
                     if (status == 0) {
+                        resetNetworkConnectionPool();
                         m_isNetworkAvailable = false;
                         emit networkStatusChanged(false);
                     }
@@ -913,7 +1015,10 @@ void TransferManager::completeSingleFile(TransferTaskGroup &group, int fileIndex
                     f.state = "FAILED";
                     grp.state = "FAILED";
                     grp.pausedByUser = true;
-                    emit taskStatusChanged(uploadId, "FAILED", "File completion retry limit reached");
+                    f.failureReason = errJson.value("message").toString();
+                    if (f.failureReason.isEmpty()) f.failureReason = tr("服务器校验文件重试次数已用尽");
+                    grp.failureReason = f.failureReason;
+                    emit taskStatusChanged(uploadId, "FAILED", f.failureReason);
                 }
             } else {
                 handleServerError(errJson, uploadId, status, fileIndex);
@@ -948,10 +1053,12 @@ void TransferManager::completeWholeTask(TransferTaskGroup &group)
         TransferTaskGroup &grp = m_tasks[uploadId];
         grp.completionInFlight = false;
         int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QByteArray respBytes = reply->readAll();
 
         if (status == 200) {
             m_isNetworkAvailable = true;
             grp.state = "COMPLETED";
+            grp.failureReason.clear();
             grp.retryCount = 0;
             grp.nextRetryTimeMs = 0;
             grp.uploadedBytes = grp.totalBytes;
@@ -960,7 +1067,7 @@ void TransferManager::completeWholeTask(TransferTaskGroup &group)
             emit taskListChanged();
             emit taskStatusChanged(uploadId, "COMPLETED", "");
         } else {
-            QJsonObject errJson = QJsonDocument::fromJson(reply->readAll()).object();
+            QJsonObject errJson = responseError(reply, respBytes, tr("服务器确认上传完成"));
             const QString code = errJson.value("code").toString();
             if (code == "TASK_STATE_CONFLICT" || code == "FILE_INCOMPLETE") {
                 grp.state = "UPLOADING";
@@ -973,6 +1080,7 @@ void TransferManager::completeWholeTask(TransferTaskGroup &group)
                                           calculateBackoffDelayMs(grp.retryCount);
                     grp.state = "UPLOADING";
                     if (status == 0) {
+                        resetNetworkConnectionPool();
                         m_isNetworkAvailable = false;
                         emit networkStatusChanged(false);
                     }
@@ -1009,20 +1117,27 @@ void TransferManager::queryTaskStatus(const QString &uploadId)
         TransferTaskGroup &grp = m_tasks[uploadId];
         grp.isSyncingStatus = false;
         int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QByteArray respBytes = reply->readAll();
 
         if (status == 200) {
             m_isNetworkAvailable = true;
-            QJsonObject respJson = QJsonDocument::fromJson(reply->readAll()).object();
+            QJsonObject respJson = QJsonDocument::fromJson(respBytes).object();
             QString responseError;
             if (!applyServerTaskResponse(grp, respJson, &responseError)) {
                 grp.state = "FAILED";
+                grp.failureReason = responseError;
                 grp.pausedByUser = true;
                 saveTasksToStorage();
                 emit taskStatusChanged(uploadId, "FAILED", responseError);
                 emit taskListChanged();
                 return;
             }
+            if (grp.state == "FAILED") {
+                restartTaskWithNewServerSession(uploadId);
+                return;
+            }
             grp.statusSyncedWithServer = true;
+            grp.failureReason.clear();
             grp.retryCount = 0;
             grp.nextRetryTimeMs = 0;
 
@@ -1038,7 +1153,7 @@ void TransferManager::queryTaskStatus(const QString &uploadId)
             saveTasksToStorage();
             emit taskListChanged();
         } else {
-            QJsonObject errJson = QJsonDocument::fromJson(reply->readAll()).object();
+            QJsonObject errJson = responseError(reply, respBytes, tr("同步上传进度"));
             const QString code = errJson.value("code").toString();
             if (isRetryableError(code, status)) {
                 grp.retryCount++;
@@ -1047,6 +1162,7 @@ void TransferManager::queryTaskStatus(const QString &uploadId)
                     grp.nextRetryTimeMs = QDateTime::currentMSecsSinceEpoch() +
                                           calculateBackoffDelayMs(grp.retryCount);
                     if (status == 0) {
+                        resetNetworkConnectionPool();
                         m_isNetworkAvailable = false;
                         emit networkStatusChanged(false);
                     }
@@ -1080,6 +1196,7 @@ void TransferManager::resumeTask(const QString &uploadId)
             QString sourceError;
             if (!validateLocalSources(group, &sourceError)) {
                 group.state = "FAILED";
+                group.failureReason = sourceError;
                 group.pausedByUser = true;
                 saveTasksToStorage();
                 emit taskStatusChanged(uploadId, "FAILED", sourceError);
@@ -1146,14 +1263,29 @@ void TransferManager::cancelTask(const QString &uploadId)
     });
 }
 
+void TransferManager::dismissFailedTask(const QString &uploadId)
+{
+    const auto it = m_tasks.constFind(uploadId);
+    if (it == m_tasks.cend() || it.value().state != "FAILED") return;
+    m_activeQueue.removeAll(uploadId);
+    m_tasks.remove(uploadId);
+    saveTasksToStorage();
+    emit taskListChanged();
+}
+
 void TransferManager::retryTask(const QString &uploadId)
 {
     if (m_tasks.contains(uploadId)) {
-        m_tasks[uploadId].retryCount = 0;
-        for (auto &f : m_tasks[uploadId].files) {
+        TransferTaskGroup &group = m_tasks[uploadId];
+        group.state = "PENDING";
+        group.retryCount = 0;
+        group.nextRetryTimeMs = 0;
+        group.failureReason.clear();
+        for (auto &f : group.files) {
             f.retryCount = 0;
             f.nextRetryTimeMs = 0;
             f.failureReason.clear();
+            if (f.state == "FAILED") f.state = "PENDING";
         }
         resumeTask(uploadId);
     }
@@ -1174,6 +1306,86 @@ void TransferManager::clearCompletedTasks()
     emit taskListChanged();
 }
 
+QJsonObject TransferManager::responseError(QNetworkReply *reply, const QByteArray &payload,
+                                                const QString &phase) const
+{
+    QJsonObject error = QJsonDocument::fromJson(payload).object();
+    const int status = reply ? reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() : 0;
+    QString code = error.value("code").toString().trimmed();
+    if (code.isEmpty()) {
+        code = status == 0 ? QStringLiteral("NETWORK_ERROR")
+                           : QStringLiteral("HTTP_%1").arg(status);
+        error["code"] = code;
+    }
+
+    QString detail = error.value("message").toString().trimmed();
+    if (detail.isEmpty() && reply) {
+        detail = reply->errorString().trimmed();
+    }
+    if (detail.isEmpty() || detail.compare(QStringLiteral("Unknown error"), Qt::CaseInsensitive) == 0) {
+        detail = tr("服务器未返回错误详情");
+    }
+
+    QString message = tr("%1失败：%2").arg(phase, detail);
+    if (status > 0) {
+        message += tr("（HTTP %1，%2）").arg(status).arg(code);
+    } else {
+        message += tr("（%1）").arg(code);
+    }
+    error["message"] = message;
+    return error;
+}
+
+void TransferManager::restartTaskWithNewServerSession(const QString &uploadId)
+{
+    if (!m_tasks.contains(uploadId)) return;
+
+    TransferTaskGroup group = m_tasks.take(uploadId);
+    m_activeQueue.removeAll(uploadId);
+    QString sourceError;
+    if (!validateLocalSources(group, &sourceError)) {
+        group.state = "FAILED";
+        group.failureReason = sourceError;
+        group.pausedByUser = true;
+        m_tasks[uploadId] = group;
+        emit taskStatusChanged(uploadId, "FAILED", sourceError);
+        saveTasksToStorage();
+        emit taskListChanged();
+        return;
+    }
+
+    group.uploadId = "temp_" + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    group.statusSyncedWithServer = true;
+    group.isSyncingStatus = false;
+    group.creationInFlight = false;
+    group.completionInFlight = false;
+    group.retryCount = 0;
+    group.nextRetryTimeMs = 0;
+    group.state = "PENDING";
+    group.failureReason.clear();
+    group.pausedByUser = false;
+    for (TransferFileItem &file : group.files) {
+        file.completionInFlight = false;
+        file.retryCount = 0;
+        file.nextRetryTimeMs = 0;
+        file.state = "PENDING";
+        file.failureReason.clear();
+        file.completedChunks.clear();
+        file.missingChunks.clear();
+        for (int index = 0; index < file.totalChunks; ++index) {
+            file.missingChunks.append(index);
+        }
+    }
+    recalculateProgress(group);
+    const QString replacementId = group.uploadId;
+    m_tasks[replacementId] = group;
+    m_activeQueue.append(replacementId);
+    emit taskIdChanged(uploadId, replacementId);
+    createServerTask(m_tasks[replacementId]);
+    saveTasksToStorage();
+    emit taskListChanged();
+}
+
 void TransferManager::handleServerError(const QJsonObject &errorJson, const QString &uploadId, int httpStatus, int fileIndex, int chunkIndex)
 {
     QString code = errorJson.value("code").toString();
@@ -1184,45 +1396,18 @@ void TransferManager::handleServerError(const QJsonObject &errorJson, const QStr
     if (!m_tasks.contains(uploadId)) return;
     TransferTaskGroup &grp = m_tasks[uploadId];
 
-    if (code == "TASK_NOT_FOUND") {
-        TransferTaskGroup grpCopy = m_tasks.take(uploadId);
-        m_activeQueue.removeAll(uploadId);
-        QString sourceError;
-        if (!validateLocalSources(grpCopy, &sourceError)) {
-            grpCopy.state = "FAILED";
-            grpCopy.pausedByUser = true;
-            m_tasks[uploadId] = grpCopy;
-            emit taskStatusChanged(uploadId, "FAILED", sourceError);
-            saveTasksToStorage();
-            emit taskListChanged();
-            return;
-        }
-        grpCopy.uploadId = "temp_" + QUuid::createUuid().toString(QUuid::WithoutBraces);
-        grpCopy.statusSyncedWithServer = true;
-        grpCopy.isSyncingStatus = false;
-        grpCopy.creationInFlight = false;
-        grpCopy.completionInFlight = false;
-        grpCopy.retryCount = 0;
-        grpCopy.nextRetryTimeMs = 0;
-        grpCopy.state = "PENDING";
-        grpCopy.pausedByUser = false;
-        for (TransferFileItem &file : grpCopy.files) {
-            file.completionInFlight = false;
-            file.state = "PENDING";
-            file.completedChunks.clear();
-            file.missingChunks.clear();
-            for (int index = 0; index < file.totalChunks; ++index) {
-                file.missingChunks.append(index);
-            }
-        }
-        recalculateProgress(grpCopy);
-        const QString replacementId = grpCopy.uploadId;
-        m_tasks[replacementId] = grpCopy;
-        m_activeQueue.append(replacementId);
-        emit taskIdChanged(uploadId, replacementId);
-        createServerTask(m_tasks[replacementId]);
+    if (httpStatus == 401) {
+        grp.statusSyncedWithServer = false;
+        grp.state = "UPLOADING";
+        grp.nextRetryTimeMs = QDateTime::currentMSecsSinceEpoch() + 1000;
+        emit authenticationRequired();
         saveTasksToStorage();
         emit taskListChanged();
+        return;
+    }
+
+    if (code == "TASK_NOT_FOUND") {
+        restartTaskWithNewServerSession(uploadId);
         return;
     }
 
@@ -1238,7 +1423,9 @@ void TransferManager::handleServerError(const QJsonObject &errorJson, const QStr
         code == "INVALID_REQUEST" || code == "CHUNK_INDEX_INVALID" ||
         code == "CHUNK_RANGE_INVALID" || code == "CHUNK_SIZE_INVALID") {
         grp.state = "FAILED";
+        grp.failureReason = msg;
         grp.pausedByUser = true;
+        if (fileIndex >= 0 && fileIndex < grp.files.size()) grp.files[fileIndex].failureReason = msg;
         emit taskStatusChanged(uploadId, "FAILED", msg);
         saveTasksToStorage();
         emit taskListChanged();
@@ -1254,18 +1441,23 @@ void TransferManager::handleServerError(const QJsonObject &errorJson, const QStr
                 return;
             } else {
                 grp.state = "FAILED";
+                grp.failureReason = msg;
                 grp.pausedByUser = true;
                 f.state = "FAILED";
+                f.failureReason = msg;
                 emit taskStatusChanged(uploadId, "FAILED", msg);
             }
         } else {
             grp.state = "FAILED";
+            grp.failureReason = msg.isEmpty() ? tr("网络重试次数已用尽") : msg;
             grp.pausedByUser = true;
-            emit taskStatusChanged(uploadId, "FAILED", msg.isEmpty() ? "Network retry limit reached" : msg);
+            emit taskStatusChanged(uploadId, "FAILED", grp.failureReason);
         }
     } else {
         grp.state = "FAILED";
+        grp.failureReason = msg;
         grp.pausedByUser = true;
+        if (fileIndex >= 0 && fileIndex < grp.files.size()) grp.files[fileIndex].failureReason = msg;
         emit taskStatusChanged(uploadId, "FAILED", msg);
     }
 
@@ -1290,7 +1482,9 @@ void TransferManager::checkNetworkStatus()
         reply->deleteLater();
         m_networkCheckInFlight = false;
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (status == 401) emit authenticationRequired();
         const bool available = reply->error() == QNetworkReply::NoError || status > 0;
+        if (!available) resetNetworkConnectionPool();
 
         if (m_isNetworkAvailable != available) {
             m_isNetworkAvailable = available;
@@ -1347,17 +1541,21 @@ void TransferManager::saveTasksToStorage()
         grpObj["parentPath"] = grp.parentPath;
         grpObj["targetPath"] = grp.targetPath;
         grpObj["serverBaseUrl"] = grp.serverBaseUrl;
+        grpObj["scopeType"] = grp.scopeType;
+        grpObj["scopeId"] = grp.scopeId;
         grpObj["chunkSize"] = grp.chunkSize;
         grpObj["totalFiles"] = grp.totalFiles;
         grpObj["totalBytes"] = grp.totalBytes;
         grpObj["uploadedBytes"] = grp.uploadedBytes;
         grpObj["state"] = grp.state;
+        grpObj["failureReason"] = grp.failureReason;
         grpObj["pausedByUser"] = grp.pausedByUser;
 
         QJsonArray filesArr;
         for (const TransferFileItem &f : grp.files) {
             QJsonObject fObj;
             fObj["path"] = f.path;
+            fObj["localPath"] = f.localPath;
             fObj["size"] = f.size;
             fObj["sha256"] = f.sha256;
             fObj["totalChunks"] = f.totalChunks;
@@ -1407,17 +1605,25 @@ void TransferManager::loadTasksFromStorage()
         grp.localRootPath = grpObj.value("localRootPath").toString();
         grp.directoryName = grpObj.value("directoryName").toString();
         grp.parentPath = grpObj.value("parentPath").toString();
-        grp.targetPath = grpObj.value("targetPath").toString();
-        if (grp.targetPath.isEmpty()) {
+        if (grpObj.contains("targetPath") && !grpObj.value("targetPath").isNull()) {
+            // An empty targetPath is intentional and represents the storage root.
+            grp.targetPath = grpObj.value("targetPath").toString();
+        } else {
             // Tasks persisted by earlier clients used parentPath/directoryName.
-            grp.targetPath = grp.parentPath + "/" + grp.directoryName;
+            grp.targetPath = grp.parentPath.isEmpty()
+                                 ? grp.directoryName
+                                 : grp.parentPath + "/" + grp.directoryName;
         }
         grp.serverBaseUrl = grpObj.value("serverBaseUrl").toString(m_baseUrl);
+        grp.scopeType = grpObj.value("scopeType").toString("PRIVATE").trimmed().toUpper();
+        if (grp.scopeType != "GROUP") grp.scopeType = "PRIVATE";
+        grp.scopeId = grp.scopeType == "GROUP" ? grpObj.value("scopeId").toString() : QString();
         grp.chunkSize = grpObj.value("chunkSize").toVariant().toLongLong();
         grp.totalFiles = grpObj.value("totalFiles").toInt();
         grp.totalBytes = grpObj.value("totalBytes").toVariant().toLongLong();
         grp.uploadedBytes = grpObj.value("uploadedBytes").toVariant().toLongLong();
         grp.state = grpObj.value("state").toString();
+        grp.failureReason = grpObj.value("failureReason").toString();
         grp.pausedByUser = grpObj.value("pausedByUser").toBool(false);
 
         if (grp.state == "CANCELLED") {
@@ -1431,6 +1637,7 @@ void TransferManager::loadTasksFromStorage()
             QJsonObject fObj = fVal.toObject();
             TransferFileItem f;
             f.path = fObj.value("path").toString();
+            f.localPath = fObj.value("localPath").toString();
             f.size = fObj.value("size").toVariant().toLongLong();
             f.sha256 = fObj.value("sha256").toString();
             f.totalChunks = fObj.value("totalChunks").toInt();
@@ -1450,7 +1657,7 @@ void TransferManager::loadTasksFromStorage()
         recalculateProgress(grp);
 
         m_tasks[grp.uploadId] = grp;
-        if (!grp.pausedByUser && grp.state != "COMPLETED") {
+        if (!grp.pausedByUser && grp.state != "COMPLETED" && grp.state != "FAILED") {
             m_activeQueue.append(grp.uploadId);
         }
     }

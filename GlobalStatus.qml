@@ -8,4 +8,5 @@ QtObject {
     property bool isLoggedIn: false
     property var devicesList: []
     property string deviceId: ""
+    property bool autoAcceptDeviceTransfers: false
 }

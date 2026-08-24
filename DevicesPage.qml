@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtCore
 import Qt.labs.platform as Labs
 
 // Devices page: readout strip, device card grid, send entry.
@@ -9,14 +10,22 @@ import Qt.labs.platform as Labs
 // forward) to the new card-based layout.
 Item {
     id: root
+
+    function refreshContent() {
+        DeviceManager.refreshDevices()
+        WebSocketClient.requestDeviceList()
+        ForwardManager.refreshTasks()
+    }
     signal storageSettingsRequested()
-    signal serverUploadRequested(string filePath)
+    signal serverUploadRequested(var filePaths)
 
     property string selectedDeviceId: ""
     property string statusMessage: ""
-    property string pendingActionFile: ""
+    property string statusTone: "normal"
+    property var pendingActionFiles: []
     property var pendingUploads: ({})
     property string creatingUploadId: ""
+    property int relayForwardRetryCount: 0
     readonly property var visibleDevices: DeviceManager.devices.filter(function(device) {
         return String(device.deviceType || "").toUpperCase() !== "WEB"
     })
@@ -24,29 +33,130 @@ Item {
         return device.deviceId !== DeviceManager.deviceId
     })
 
-    function showStatus(message) {
+    function showStatus(message, tone) {
         statusMessage = message
-        statusTimer.restart()
+        statusTone = tone || "normal"
     }
 
-    function sendFileFromShell(filePath) {
-        sendDialog.openWithFile(filePath, "")
+    function sendFilesFromShell(filePaths) {
+        sendDialog.openWithFiles(filePaths, "")
+    }
+
+    function selectionSummary(filePaths) {
+        if (!filePaths || filePaths.length === 0) return qsTr("未选择文件")
+        if (filePaths.length === 1) return String(filePaths[0]).split(/[\\/]/).pop()
+        return qsTr("已选择 %1 个文件").arg(filePaths.length)
+    }
+
+    function deviceById(deviceId) {
+        for (var i = 0; i < DeviceManager.devices.length; ++i)
+            if (DeviceManager.devices[i].deviceId === deviceId) return DeviceManager.devices[i]
+        return null
+    }
+
+    function lanRoute(target) {
+        if (!target) return ({})
+        var addresses = target.localAddresses || []
+        // Older clients only publish deviceAddress. Keep LAN eligible when
+        // the server has that legacy field but no CIDR list yet.
+        if (addresses.length === 0 && String(target.deviceAddress || "").length > 0)
+            addresses = [target.deviceAddress]
+        return DeviceManager.reachableLanRoute(addresses)
+    }
+
+    function lanAddress(target) {
+        return String(lanRoute(target).targetAddress || "")
+    }
+
+    function canUseLan(target) {
+        return target && target.online === true && Number(target.listenPort || 0) > 0
+                && lanAddress(target).length > 0
+    }
+
+    function enqueueRelay(targetDeviceId, destinationPath, filePath, directory) {
+        var temporaryId = directory ? TransferManager.startFolderUpload(filePath, "relay")
+                                    : TransferManager.startFileUpload(filePath, "relay")
+        if (temporaryId.length === 0) {
+            showStatus(qsTr("无法创建上传任务，请检查文件是否仍然存在"), "error")
+            return
+        }
+        var next = {}
+        for (var k in pendingUploads) next[k] = pendingUploads[k]
+        next[temporaryId] = { targetDeviceId: targetDeviceId, destinationPath: destinationPath }
+        setPendingUploads(next)
+        showStatus(qsTr("正在上传至中转服务器，完成后自动通知对方"))
+    }
+
+    function setPendingUploads(next) {
+        pendingUploads = next
+        relayIntentSettings.pendingUploadsJson = JSON.stringify(next)
+    }
+
+    function removePendingUpload(uploadId) {
+        var next = {}
+        for (var k in pendingUploads) if (k !== uploadId) next[k] = pendingUploads[k]
+        setPendingUploads(next)
+    }
+
+    function fallbackToRelay(targetDeviceId, destinationPath, filePath, directory, reason) {
+        showStatus(qsTr("直连失败，正在自动切换服务器中转：") + reason, "warning")
+        enqueueRelay(targetDeviceId, destinationPath, filePath, directory)
+    }
+
+    function fallbackFromLan(targetDeviceId, destinationPath, filePath, directory, reason) {
+        var target = deviceById(targetDeviceId)
+        if (target && target.online === true && P2pTransferManager.available) {
+            showStatus(qsTr("LAN 失败，正在尝试 P2P：") + reason, "warning")
+            P2pTransferManager.sendPath(targetDeviceId, destinationPath, filePath)
+        } else {
+            fallbackToRelay(targetDeviceId, destinationPath, filePath, directory, reason)
+        }
+    }
+
+    Settings {
+        id: relayIntentSettings
+        category: "ForwardV11"
+        property string pendingUploadsJson: "{}"
     }
 
     Timer {
-        id: statusTimer
-        interval: 10000
-        onTriggered: root.statusMessage = ""
+        id: relayForwardRetryTimer
+        interval: Math.min(30000, 2000 * Math.pow(2, root.relayForwardRetryCount))
+        onTriggered: {
+            root.creatingUploadId = ""
+            root.resumePendingRelays()
+        }
     }
 
     Labs.FileDialog {
         id: serverFileDialog
-        title: qsTr("选择要上传到 MyFolder 服务器的文件")
+        title: qsTr("选择要发送的一个或多个文件")
+        fileMode: Labs.FileDialog.OpenFiles
         onAccepted: {
-            var selectedPath = decodeURIComponent(file.toString()
-                                                   .replace(/^file:\/\/\//, "")
-                                                   .replace(/^file:\/\//, ""))
-            root.pendingActionFile = selectedPath
+            var selectedPaths = []
+            for (var i = 0; i < files.length; ++i) {
+                var selectedPath = ShellIntegration.localFilePath(files[i])
+                if (selectedPath.length > 0) selectedPaths.push(selectedPath)
+            }
+            if (selectedPaths.length === 0) {
+                root.showStatus(qsTr("无法读取所选文件路径"), "error")
+                return
+            }
+            root.pendingActionFiles = selectedPaths
+            sendActionPopup.open()
+        }
+    }
+
+    Labs.FolderDialog {
+        id: serverFolderDialog
+        title: qsTr("选择要发送的文件夹")
+        onAccepted: {
+            var selectedFolder = ShellIntegration.localFilePath(folder)
+            if (selectedFolder.length === 0) {
+                root.showStatus(qsTr("无法读取所选文件夹路径"), "error")
+                return
+            }
+            root.pendingActionFiles = [selectedFolder]
             sendActionPopup.open()
         }
     }
@@ -81,7 +191,7 @@ Item {
                     Text { text: qsTr("发送文件"); font.pixelSize: 15; font.bold: true; color: Theme.ink }
                     Text {
                         Layout.fillWidth: true
-                        text: root.pendingActionFile.split(/[\\/]/).pop()
+                        text: root.selectionSummary(root.pendingActionFiles)
                         elide: Text.ElideMiddle
                         font.family: Theme.dataFont; font.pixelSize: 10; color: Theme.muted
                     }
@@ -103,7 +213,7 @@ Item {
                     symbol: "☁"
                     onChosen: {
                         sendActionPopup.close()
-                        root.serverUploadRequested(root.pendingActionFile)
+                        root.serverUploadRequested(root.pendingActionFiles)
                     }
                 }
                 SendOption {
@@ -114,7 +224,7 @@ Item {
                     symbol: "→"
                     onChosen: {
                         sendActionPopup.close()
-                        sendDialog.openWithFile(root.pendingActionFile, root.selectedDeviceId)
+                        sendDialog.openWithFiles(root.pendingActionFiles, root.selectedDeviceId)
                     }
                 }
             }
@@ -126,14 +236,57 @@ Item {
             if (TransferManager.taskList[i].uploadId === uploadId) return TransferManager.taskList[i]
         return null
     }
+    function existingForward(uploadId, intent) {
+        for (var i = 0; i < ForwardManager.tasks.length; ++i) {
+            var task = ForwardManager.tasks[i]
+            if (task.relayUploadId === uploadId && task.channel === "RELAY"
+                    && task.sourceDeviceId === DeviceManager.deviceId
+                    && task.targetDeviceId === intent.targetDeviceId
+                    && task.destinationPath === intent.destinationPath
+                    && task.state !== "FAILED" && task.state !== "CANCELLED") return task
+        }
+        return null
+    }
     function createForwardWhenReady(uploadId) {
         var intent = pendingUploads[uploadId]
         var task = taskById(uploadId)
         if (!intent || !task || task.state !== "COMPLETED" || creatingUploadId.length > 0) return
+        if (existingForward(uploadId, intent)) {
+            removePendingUpload(uploadId)
+            return
+        }
         creatingUploadId = uploadId
         ForwardManager.createForward(intent.targetDeviceId, intent.destinationPath, false,
                                      "RELAY", uploadId, task.files)
         showStatus(qsTr("上传完成，正在创建转发任务"))
+    }
+    function resumePendingRelays() {
+        if (creatingUploadId.length > 0) return
+        for (var uploadId in pendingUploads) {
+            var task = taskById(uploadId)
+            if (task && task.state === "COMPLETED") {
+                createForwardWhenReady(uploadId)
+                return
+            }
+        }
+    }
+
+    Component.onCompleted: {
+        try {
+            var restored = JSON.parse(relayIntentSettings.pendingUploadsJson || "{}")
+            pendingUploads = restored && typeof restored === "object" ? restored : ({})
+        } catch (error) {
+            setPendingUploads({})
+        }
+        relayResumeTimer.start()
+    }
+
+    Timer {
+        id: relayResumeTimer
+        interval: 1500
+        onTriggered: {
+            ForwardManager.refreshTasks()
+        }
     }
 
     Connections {
@@ -144,42 +297,76 @@ Item {
             var next = {}
             for (var k in root.pendingUploads) if (k !== temporaryId) next[k] = root.pendingUploads[k]
             next[uploadId] = intent
-            root.pendingUploads = next
+            root.setPendingUploads(next)
         }
         function onTaskStatusChanged(uploadId, status, errorMessage) {
             if (status === "COMPLETED") root.createForwardWhenReady(uploadId)
             else if (status === "FAILED" && root.pendingUploads[uploadId])
-                root.showStatus(errorMessage || qsTr("RELAY 上传失败"))
+                root.showStatus(errorMessage || qsTr("RELAY 上传失败"), "error")
         }
     }
     Connections {
         target: ForwardManager
         function onForwardCreated(forwardId) {
-            var next = {}
-            for (var k in root.pendingUploads) if (k !== root.creatingUploadId) next[k] = root.pendingUploads[k]
-            root.pendingUploads = next
+            root.removePendingUpload(root.creatingUploadId)
             root.creatingUploadId = ""
+            root.relayForwardRetryCount = 0
             root.showStatus(qsTr("已发出，等待对方接收"))
+            Qt.callLater(root.resumePendingRelays)
         }
         function onActionFailed(operation, code, message) {
+            if (operation !== "create" || root.creatingUploadId.length === 0) return
             root.creatingUploadId = ""
-            root.showStatus((code ? code + ": " : "") + (message || qsTr("发送失败")))
+            root.relayForwardRetryCount++
+            root.showStatus((code ? code + ": " : "")
+                            + (message || qsTr("创建中转任务失败")) + qsTr("，正在自动重试"), "warning")
+            relayForwardRetryTimer.restart()
+        }
+        function onTasksChanged() { Qt.callLater(root.resumePendingRelays) }
+    }
+
+    Connections {
+        target: LanTransferManager
+        function onForwardCreated(forwardId) {
+            ForwardManager.queryTask(forwardId)
+            root.showStatus(qsTr("LAN 任务已发出，等待对方接收"))
+        }
+        function onCreateFailed(message) {
+            root.showStatus(qsTr("LAN 任务创建失败：") + message, "warning")
+        }
+    }
+    Connections {
+        target: P2pTransferManager
+        function onForwardCreated(forwardId) {
+            ForwardManager.queryTask(forwardId)
+            root.showStatus(qsTr("P2P 任务已发出，等待对方接收"))
+        }
+        function onCreateFailed(message) {
+            root.showStatus(qsTr("P2P 任务创建失败，正在改用服务器中转：") + message, "warning")
         }
     }
 
     SendToDialog {
         id: sendDialog
-        onSendConfirmed: function(deviceId, destinationPath, filePath) {
-            var temporaryId = TransferManager.startFileUpload(filePath, "relay")
-            if (temporaryId.length === 0) {
-                root.showStatus(qsTr("无法创建上传任务，请检查文件是否仍然存在"))
-                return
+        onSendConfirmed: function(deviceId, destinationPath, filePaths) {
+            var target = root.deviceById(deviceId)
+            for (var i = 0; i < filePaths.length; ++i) {
+                var filePath = String(filePaths[i] || "")
+                if (root.canUseLan(target)) {
+                    var route = root.lanRoute(target)
+                    LanTransferManager.sendPathViaRoute(deviceId, String(route.targetAddress || ""),
+                                                        String(route.sourceAddress || ""),
+                                                        Number(target.listenPort), destinationPath, filePath)
+                } else if (target && target.online === true && P2pTransferManager.available) {
+                    P2pTransferManager.sendPath(deviceId, destinationPath, filePath)
+                } else {
+                    root.enqueueRelay(deviceId, destinationPath, filePath,
+                                      LanTransferManager.isDirectory(filePath))
+                }
             }
-            var next = {}
-            for (var k in root.pendingUploads) next[k] = root.pendingUploads[k]
-            next[temporaryId] = { targetDeviceId: deviceId, destinationPath: destinationPath }
-            root.pendingUploads = next
-            root.showStatus(qsTr("正在上传，完成后自动通知对方"))
+            root.showStatus(filePaths.length > 1
+                            ? qsTr("正在创建 %1 个文件传输任务").arg(filePaths.length)
+                            : qsTr("正在计算文件校验值并创建传输任务"))
         }
     }
 
@@ -217,6 +404,11 @@ Item {
                 text: qsTr("发送文件")
                 onClicked: serverFileDialog.open()
             }
+            UiButton {
+                kind: "primary"
+                text: qsTr("发送文件夹")
+                onClicked: serverFolderDialog.open()
+            }
         }
 
         // readouts
@@ -233,7 +425,10 @@ Item {
                     model: [
                         { label: "可用客户端", value: root.visibleDevices.length, live: false },
                         { label: "在线", value: root.visibleDevices.filter(function(d){ return d.online }).length, live: true },
-                        { label: "转发任务", value: ForwardManager.tasks.length, live: false }
+                        { label: "进行中传输", value: ForwardManager.tasks.filter(function(t) {
+                            return t.state !== "COMPLETED" && t.state !== "CANCELLED"
+                                    && t.state !== "FAILED" && t.state !== "REJECTED"
+                        }).length, live: false }
                     ]
                     delegate: Item {
                         id: readout
@@ -308,14 +503,11 @@ Item {
             }
         }
 
-        // status line
-        Text {
-            visible: root.statusMessage.length > 0
+        UiNotice {
             Layout.fillWidth: true
-            text: root.statusMessage
-            font.pixelSize: 11
-            color: "#8B651F"
-            elide: Text.ElideRight
+            message: root.statusMessage
+            tone: root.statusTone
+            onDismissed: root.statusMessage = ""
         }
     }
 

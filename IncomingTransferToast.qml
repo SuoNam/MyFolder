@@ -9,6 +9,7 @@ Window {
     property var offer: null
     signal acceptRequested()
     signal laterRequested()
+    signal rejectRequested()
 
     width: 360
     height: 132
@@ -61,6 +62,7 @@ Window {
             }
             RowLayout {
                 Layout.fillWidth: true; spacing: 8
+                UiButton { Layout.fillWidth: true; kind: "danger"; text: qsTr("拒绝"); onClicked: root.rejectRequested() }
                 UiButton { Layout.fillWidth: true; text: qsTr("稍后"); onClicked: root.laterRequested() }
                 UiButton { Layout.fillWidth: true; kind: "primary"; text: qsTr("接收"); onClicked: root.acceptRequested() }
             }

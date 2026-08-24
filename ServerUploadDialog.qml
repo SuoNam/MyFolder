@@ -12,28 +12,47 @@ Popup {
     padding: 0
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-    property string localFilePath: ""
+    property var localFilePaths: []
     property string currentPath: ""
     property var directories: []
+    property var groups: []
+    property var selectedGroup: null
+    property string targetScopeType: "PRIVATE"
+    property string targetScopeId: ""
+    property bool choosingGroup: false
     property bool browsing: false
     property bool loading: false
     property string errorMessage: ""
-    signal uploadConfirmed(string filePath, string serverPath)
+    signal uploadConfirmed(var filePaths, string serverPath, string scopeType, string scopeId)
 
-    function fileName() { return localFilePath.split(/[\\/]/).pop() }
+    function fileName() {
+        if (localFilePaths.length === 0) return qsTr("未选择文件")
+        if (localFilePaths.length === 1) return String(localFilePaths[0]).split(/[\\/]/).pop()
+        return qsTr("已选择 %1 个文件").arg(localFilePaths.length)
+    }
     function openFor(filePath) {
-        localFilePath = filePath
+        openForPaths([filePath])
+    }
+    function openForPaths(filePaths) {
+        localFilePaths = filePaths || []
         currentPath = ""
         directories = []
+        groups = []
+        selectedGroup = null
+        targetScopeType = "PRIVATE"
+        targetScopeId = ""
+        choosingGroup = false
         browsing = false
+        loading = true
         errorMessage = ""
         open()
+        HttpHandler.loadGroups()
     }
     function loadDirectory(path) {
         currentPath = path
         loading = true
         errorMessage = ""
-        HttpHandler.listServerDirectory(path)
+        HttpHandler.listScopedDirectory(path, targetScopeType, targetScopeId)
     }
     function enterDirectory(entry) {
         var path = String(entry.path || entry.name || "")
@@ -55,8 +74,21 @@ Popup {
 
     Connections {
         target: HttpHandler
-        function onServerDirectoryListed(directoryPath, entries, error) {
-            if (!root.visible || directoryPath !== root.currentPath) return
+        function onGroupsResult(response) {
+            if (!root.visible) return
+            root.loading = false
+            if (response.status !== 200) return
+            var writable = []
+            var source = response.data || []
+            for (var i = 0; i < source.length; ++i) {
+                var permission = String(source[i].myPermission || "").toUpperCase()
+                if (permission === "OWNER" || permission === "WRITE") writable.push(source[i])
+            }
+            root.groups = writable
+        }
+        function onScopedDirectoryListed(scopeType, scopeId, directoryPath, entries, error) {
+            if (!root.visible || scopeType !== root.targetScopeType || scopeId !== root.targetScopeId
+                    || directoryPath !== root.currentPath) return
             root.loading = false
             root.errorMessage = error
             root.directories = entries.filter(function(item) {
@@ -106,13 +138,31 @@ Popup {
                 title: qsTr("发送到默认位置")
                 description: qsTr("保存至服务器默认目录  /inbox")
                 symbol: "⌂"
-                onChosen: { root.uploadConfirmed(root.localFilePath, "inbox"); root.close() }
+                onChosen: { root.uploadConfirmed(root.localFilePaths, "inbox", "PRIVATE", ""); root.close() }
             }
             DestinationOption {
                 title: qsTr("选择指定位置")
                 description: qsTr("逐级浏览服务器文件夹")
                 symbol: "▣"
-                onChosen: { root.browsing = true; root.loadDirectory("") }
+                onChosen: {
+                    root.targetScopeType = "PRIVATE"; root.targetScopeId = ""
+                    root.selectedGroup = null; root.choosingGroup = false
+                    root.browsing = true; root.loadDirectory("")
+                }
+            }
+            DestinationOption {
+                title: qsTr("上传至群组")
+                description: root.groups.length > 0
+                             ? qsTr("选择有写权限的群组及目标文件夹")
+                             : qsTr("当前没有可写群组")
+                symbol: "♧"
+                enabled: root.groups.length > 0
+                opacity: enabled ? 1 : 0.55
+                onChosen: {
+                    root.targetScopeType = "GROUP"; root.targetScopeId = ""
+                    root.selectedGroup = null; root.choosingGroup = true
+                    root.currentPath = ""; root.directories = []; root.browsing = true
+                }
             }
         }
 
@@ -126,19 +176,50 @@ Popup {
                 RowLayout {
                     anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 14; spacing: 8
                     UiButton {
-                        text: qsTr("上一级"); enabled: root.currentPath.length > 0 && !root.loading
+                        text: qsTr("上一级"); enabled: root.selectedGroup !== null && root.currentPath.length > 0 && !root.loading
                         onClicked: root.loadDirectory(root.parentPath(root.currentPath))
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: root.currentPath.length > 0 ? "/" + root.currentPath : qsTr("服务器根目录")
+                        text: root.selectedGroup
+                              ? String(root.selectedGroup.name || "") + " / " + (root.currentPath || qsTr("根目录"))
+                              : (root.choosingGroup ? qsTr("请选择目标群组")
+                                                   : (root.currentPath.length > 0 ? "/" + root.currentPath : qsTr("服务器根目录")))
                         color: Theme.ink2; font.family: Theme.dataFont; font.pixelSize: 11; elide: Text.ElideMiddle
                     }
                 }
             }
 
             ListView {
+                visible: root.choosingGroup && root.selectedGroup === null
+                Layout.fillWidth: true; Layout.preferredHeight: 252
+                clip: true; model: root.groups
+                delegate: Rectangle {
+                    id: groupRow
+                    required property var modelData
+                    width: ListView.view.width; height: 54
+                    color: groupMouse.containsMouse ? Theme.signalWash : Theme.surface
+                    MouseArea {
+                        id: groupMouse; anchors.fill: parent; hoverEnabled: true
+                        onClicked: {
+                            root.selectedGroup = groupRow.modelData
+                            root.targetScopeId = String(groupRow.modelData.groupId || "")
+                            root.loadDirectory("")
+                        }
+                    }
+                    RowLayout {
+                        anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 16; spacing: 11
+                        Rectangle { width: 30; height: 30; radius: 7; color: Theme.signalWash; Text { anchors.centerIn: parent; text: "♧"; color: Theme.signalDeep; font.bold: true } }
+                        ColumnLayout { Layout.fillWidth: true; spacing: 2; Text { text: String(groupRow.modelData.name || ""); color: Theme.ink; font.pixelSize: 13; font.bold: true } Text { text: String(groupRow.modelData.myPermission) === "OWNER" ? qsTr("所有者") : qsTr("可读写"); color: Theme.muted; font.pixelSize: 10 } }
+                        Text { text: "›"; font.pixelSize: 20; color: Theme.faint }
+                    }
+                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.lineSoft }
+                }
+            }
+
+            ListView {
                 id: directoryList
+                visible: !root.choosingGroup || root.selectedGroup !== null
                 Layout.fillWidth: true; Layout.preferredHeight: 252
                 clip: true; model: root.directories
                 delegate: Rectangle {
@@ -178,15 +259,30 @@ Popup {
                 Rectangle { width: parent.width; height: 1; color: Theme.lineSoft }
                 RowLayout {
                     anchors.fill: parent; anchors.margins: 12; spacing: 8
-                    UiButton { text: qsTr("返回"); onClicked: root.browsing = false }
+                    UiButton {
+                        text: qsTr("返回")
+                        onClicked: {
+                            if (root.choosingGroup && root.selectedGroup) {
+                                root.selectedGroup = null; root.targetScopeId = ""
+                                root.currentPath = ""; root.directories = []
+                            } else root.browsing = false
+                        }
+                    }
                     Text {
                         Layout.fillWidth: true
-                        text: qsTr("当前：") + (root.currentPath.length > 0 ? "/" + root.currentPath : "/")
+                        text: root.selectedGroup
+                              ? qsTr("当前：") + String(root.selectedGroup.name || "") + " / " + (root.currentPath || qsTr("根目录"))
+                              : qsTr("当前：") + (root.currentPath.length > 0 ? "/" + root.currentPath : "/")
                         font.family: Theme.dataFont; font.pixelSize: 10; color: Theme.muted; elide: Text.ElideMiddle
                     }
                     UiButton {
-                        kind: "primary"; text: qsTr("上传到此文件夹"); enabled: !root.loading
-                        onClicked: { root.uploadConfirmed(root.localFilePath, root.currentPath); root.close() }
+                        kind: "primary"; text: qsTr("上传到此文件夹")
+                        enabled: !root.loading && (!root.choosingGroup || root.selectedGroup !== null)
+                        onClicked: {
+                            root.uploadConfirmed(root.localFilePaths, root.currentPath,
+                                                 root.targetScopeType, root.targetScopeId)
+                            root.close()
+                        }
                     }
                 }
             }

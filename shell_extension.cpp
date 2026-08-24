@@ -8,6 +8,7 @@
 #include <initguid.h>
 #include <new>
 #include <algorithm>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -24,6 +25,54 @@ LONG g_objectCount = 0;
 LONG g_serverLocks = 0;
 
 enum class CommandKind { Root, Upload, Send };
+
+const wchar_t *commandKindName(CommandKind kind)
+{
+    if (kind == CommandKind::Upload) return L"Upload";
+    if (kind == CommandKind::Send) return L"Send";
+    return L"Root";
+}
+
+void writeDiagnostic(const wchar_t *method, CommandKind kind,
+                     IShellItemArray *items = nullptr, HRESULT result = S_OK)
+{
+    wchar_t localAppData[MAX_PATH] = {};
+    if (!GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, ARRAYSIZE(localAppData))) return;
+
+    wchar_t directory[MAX_PATH] = {};
+    wchar_t logPath[MAX_PATH] = {};
+    if (FAILED(StringCchPrintfW(directory, ARRAYSIZE(directory), L"%s\\MyFolder", localAppData))
+        || FAILED(StringCchPrintfW(logPath, ARRAYSIZE(logPath),
+                                   L"%s\\shell-extension.log", directory))) return;
+    CreateDirectoryW(directory, nullptr);
+
+    DWORD count = 0;
+    const HRESULT countResult = items ? items->GetCount(&count) : S_FALSE;
+    SYSTEMTIME now = {};
+    GetLocalTime(&now);
+    wchar_t line[512] = {};
+    if (FAILED(StringCchPrintfW(line, ARRAYSIZE(line),
+                               L"%04u-%02u-%02u %02u:%02u:%02u.%03u pid=%lu tid=%lu "
+                               L"kind=%s method=%s items=%p count=%lu countHr=0x%08lX hr=0x%08lX\r\n",
+                               now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute,
+                               now.wSecond, now.wMilliseconds, GetCurrentProcessId(),
+                               GetCurrentThreadId(), commandKindName(kind), method, items,
+                               count, static_cast<unsigned long>(countResult),
+                               static_cast<unsigned long>(result)))) return;
+
+    const HANDLE file = CreateFileW(logPath, FILE_APPEND_DATA,
+                                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                    nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return;
+    int utf8Length = WideCharToMultiByte(CP_UTF8, 0, line, -1, nullptr, 0, nullptr, nullptr);
+    if (utf8Length > 1) {
+        std::vector<char> utf8(static_cast<size_t>(utf8Length));
+        WideCharToMultiByte(CP_UTF8, 0, line, -1, utf8.data(), utf8Length, nullptr, nullptr);
+        DWORD written = 0;
+        WriteFile(file, utf8.data(), static_cast<DWORD>(utf8Length - 1), &written, nullptr);
+    }
+    CloseHandle(file);
+}
 
 bool readInstallDirectory(wchar_t *directory, DWORD characterCount)
 {
@@ -62,25 +111,72 @@ std::vector<CommandKind> enabledCommands()
     return result;
 }
 
-HRESULT selectedFilePath(IShellItemArray *items, PWSTR *path)
+HRESULT selectedFilePaths(IShellItemArray *items, std::vector<std::wstring> *paths)
 {
-    if (!items || !path) return E_INVALIDARG;
-    *path = nullptr;
+    if (!items || !paths) return E_INVALIDARG;
+    paths->clear();
     DWORD count = 0;
-    if (FAILED(items->GetCount(&count)) || count != 1) return E_FAIL;
-    IShellItem *item = nullptr;
-    HRESULT hr = items->GetItemAt(0, &item);
-    if (FAILED(hr)) return hr;
-    SFGAOF attributes = 0;
-    hr = item->GetAttributes(SFGAO_FILESYSTEM | SFGAO_FOLDER, &attributes);
-    if (SUCCEEDED(hr) && (attributes & SFGAO_FILESYSTEM) != 0
-        && (attributes & SFGAO_FOLDER) == 0) {
-        hr = item->GetDisplayName(SIGDN_FILESYSPATH, path);
-    } else {
-        hr = E_FAIL;
+    if (FAILED(items->GetCount(&count)) || count == 0 || count > 1000) return E_FAIL;
+    paths->reserve(count);
+    for (DWORD index = 0; index < count; ++index) {
+        IShellItem *item = nullptr;
+        HRESULT hr = items->GetItemAt(index, &item);
+        if (FAILED(hr)) return hr;
+        SFGAOF attributes = 0;
+        hr = item->GetAttributes(SFGAO_FILESYSTEM | SFGAO_FOLDER, &attributes);
+        PWSTR path = nullptr;
+        if (SUCCEEDED(hr) && (attributes & SFGAO_FILESYSTEM) != 0
+            && (attributes & SFGAO_FOLDER) == 0) {
+            hr = item->GetDisplayName(SIGDN_FILESYSPATH, &path);
+        } else {
+            hr = E_FAIL;
+        }
+        item->Release();
+        if (FAILED(hr) || !path) {
+            if (path) CoTaskMemFree(path);
+            paths->clear();
+            return FAILED(hr) ? hr : E_FAIL;
+        }
+        paths->emplace_back(path);
+        CoTaskMemFree(path);
     }
-    item->Release();
-    return hr;
+    return S_OK;
+}
+
+bool writeSelectionFile(const std::vector<std::wstring> &paths, wchar_t *selectionFile)
+{
+    wchar_t tempDirectory[MAX_PATH] = {};
+    if (!GetTempPathW(ARRAYSIZE(tempDirectory), tempDirectory)
+        || !GetTempFileNameW(tempDirectory, L"MFS", 0, selectionFile)) return false;
+    HANDLE file = CreateFileW(selectionFile, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                              FILE_ATTRIBUTE_TEMPORARY, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        DeleteFileW(selectionFile);
+        return false;
+    }
+    bool ok = true;
+    for (const std::wstring &path : paths) {
+        const int byteCount = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                                                   path.data(), int(path.size()),
+                                                   nullptr, 0, nullptr, nullptr);
+        if (byteCount <= 0) { ok = false; break; }
+        std::vector<char> utf8(static_cast<size_t>(byteCount));
+        if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path.data(), int(path.size()),
+                                utf8.data(), byteCount, nullptr, nullptr) != byteCount) {
+            ok = false;
+            break;
+        }
+        DWORD written = 0;
+        if (!WriteFile(file, utf8.data(), DWORD(utf8.size()), &written, nullptr)
+            || written != utf8.size()
+            || !WriteFile(file, "\n", 1, &written, nullptr) || written != 1) {
+            ok = false;
+            break;
+        }
+    }
+    CloseHandle(file);
+    if (!ok) DeleteFileW(selectionFile);
+    return ok;
 }
 
 class ExplorerCommand;
@@ -88,8 +184,12 @@ class ExplorerCommand;
 class CommandEnumerator final : public IEnumExplorerCommand
 {
 public:
-    explicit CommandEnumerator(std::vector<CommandKind> commands)
-        : m_commands(std::move(commands)) { InterlockedIncrement(&g_objectCount); }
+    CommandEnumerator(std::vector<CommandKind> commands, IShellItemArray *selection)
+        : m_commands(std::move(commands)), m_selection(selection)
+    {
+        if (m_selection) m_selection->AddRef();
+        InterlockedIncrement(&g_objectCount);
+    }
 
     IFACEMETHODIMP QueryInterface(REFIID iid, void **object) override
     {
@@ -118,7 +218,7 @@ public:
     IFACEMETHODIMP Clone(IEnumExplorerCommand **clone) override
     {
         if (!clone) return E_POINTER;
-        auto *copy = new (std::nothrow) CommandEnumerator(m_commands);
+        auto *copy = new (std::nothrow) CommandEnumerator(m_commands, m_selection);
         if (!copy) return E_OUTOFMEMORY;
         copy->m_index = m_index;
         *clone = copy;
@@ -126,16 +226,26 @@ public:
     }
 
 private:
-    ~CommandEnumerator() { InterlockedDecrement(&g_objectCount); }
+    ~CommandEnumerator()
+    {
+        if (m_selection) m_selection->Release();
+        InterlockedDecrement(&g_objectCount);
+    }
     LONG m_refs = 1;
     std::vector<CommandKind> m_commands;
+    IShellItemArray *m_selection = nullptr;
     size_t m_index = 0;
 };
 
-class ExplorerCommand final : public IExplorerCommand
+class ExplorerCommand final : public IExplorerCommand, public IObjectWithSelection
 {
 public:
-    explicit ExplorerCommand(CommandKind kind) : m_kind(kind) { InterlockedIncrement(&g_objectCount); }
+    ExplorerCommand(CommandKind kind, IShellItemArray *selection = nullptr)
+        : m_kind(kind), m_selection(selection)
+    {
+        if (m_selection) m_selection->AddRef();
+        InterlockedIncrement(&g_objectCount);
+    }
 
     IFACEMETHODIMP QueryInterface(REFIID iid, void **object) override
     {
@@ -143,6 +253,8 @@ public:
         *object = nullptr;
         if (IsEqualIID(iid, IID_IUnknown) || IsEqualIID(iid, IID_IExplorerCommand))
             *object = static_cast<IExplorerCommand *>(this);
+        else if (IsEqualIID(iid, IID_IObjectWithSelection))
+            *object = static_cast<IObjectWithSelection *>(this);
         if (!*object) return E_NOINTERFACE;
         AddRef();
         return S_OK;
@@ -154,12 +266,30 @@ public:
         if (refs == 0) delete this;
         return static_cast<ULONG>(refs);
     }
+    IFACEMETHODIMP SetSelection(IShellItemArray *selection) override
+    {
+        if (selection) selection->AddRef();
+        if (m_selection) m_selection->Release();
+        m_selection = selection;
+        writeDiagnostic(L"SetSelection", m_kind, m_selection);
+        return S_OK;
+    }
+    IFACEMETHODIMP GetSelection(REFIID iid, void **object) override
+    {
+        if (!object) return E_POINTER;
+        *object = nullptr;
+        const HRESULT hr = m_selection ? m_selection->QueryInterface(iid, object) : E_NOINTERFACE;
+        writeDiagnostic(L"GetSelection", m_kind, m_selection, hr);
+        return hr;
+    }
     IFACEMETHODIMP GetTitle(IShellItemArray *, PWSTR *title) override
     {
         const wchar_t *value = L"MyFolder";
         if (m_kind == CommandKind::Upload) value = L"\u4e0a\u4f20\u5230 MyFolder \u670d\u52a1\u5668";
         else if (m_kind == CommandKind::Send) value = L"\u53d1\u9001\u5230\u6307\u5b9a MyFolder \u5ba2\u6237\u7aef";
-        return SHStrDupW(value, title);
+        const HRESULT hr = SHStrDupW(value, title);
+        writeDiagnostic(L"GetTitle", m_kind, m_selection, hr);
+        return hr;
     }
     IFACEMETHODIMP GetIcon(IShellItemArray *, PWSTR *icon) override
     {
@@ -187,39 +317,59 @@ public:
     IFACEMETHODIMP GetState(IShellItemArray *items, BOOL, EXPCMDSTATE *state) override
     {
         if (!state) return E_POINTER;
-        PWSTR path = nullptr;
-        const HRESULT hr = selectedFilePath(items, &path);
-        if (path) CoTaskMemFree(path);
-        const bool enabled = SUCCEEDED(hr) && (m_kind != CommandKind::Root || !enabledCommands().empty());
-        *state = enabled ? ECS_ENABLED : ECS_HIDDEN;
+        // Explorer may query both the root command and its children before it
+        // supplies the selected item array. Hiding a child in that preliminary
+        // query leaves a visible but empty MyFolder submenu, especially for a
+        // multi-selection. Invoke() still validates the real selection before
+        // launching the application.
+        if (m_kind == CommandKind::Root) {
+            *state = enabledCommands().empty() ? ECS_HIDDEN : ECS_ENABLED;
+            writeDiagnostic(L"GetState", m_kind, items ? items : m_selection);
+            return S_OK;
+        }
+        // Do not validate the selection while Explorer is constructing the
+        // menu. With a multi-selection Windows can supply a partial/lazy shell
+        // item array here; resolving every path then may fail and would hide
+        // every child, producing an empty submenu. The extension is registered
+        // for file items only, and Invoke() performs the authoritative path
+        // validation before launching MyFolder.
+        (void)items;
+        *state = ECS_ENABLED;
+        writeDiagnostic(L"GetState", m_kind, items ? items : m_selection);
         return S_OK;
     }
     IFACEMETHODIMP Invoke(IShellItemArray *items, IBindCtx *) override
     {
         if (m_kind == CommandKind::Root) return S_OK;
-        PWSTR path = nullptr;
-        HRESULT hr = selectedFilePath(items, &path);
+        std::vector<std::wstring> paths;
+        IShellItemArray *selection = items ? items : m_selection;
+        HRESULT hr = selectedFilePaths(selection, &paths);
+        writeDiagnostic(L"Invoke", m_kind, selection, hr);
         if (FAILED(hr)) return hr;
 
         wchar_t directory[MAX_PATH] = {};
         wchar_t executable[MAX_PATH] = {};
+        wchar_t selectionFile[MAX_PATH] = {};
         wchar_t parameters[32768] = {};
         if (!readInstallDirectory(directory, ARRAYSIZE(directory))
+            || !writeSelectionFile(paths, selectionFile)
             || FAILED(StringCchPrintfW(executable, ARRAYSIZE(executable), L"%s\\appMyFolder.exe", directory))
             || FAILED(StringCchPrintfW(parameters, ARRAYSIZE(parameters), L"%s \"%s\"",
-                                       m_kind == CommandKind::Upload ? L"--upload-server" : L"--send-client",
-                                       path))) {
-            CoTaskMemFree(path);
+                                       m_kind == CommandKind::Upload
+                                           ? L"--upload-server-selection" : L"--send-client-selection",
+                                       selectionFile))) {
+            if (selectionFile[0]) DeleteFileW(selectionFile);
             return E_FAIL;
         }
-        CoTaskMemFree(path);
         const HINSTANCE result = ShellExecuteW(nullptr, L"open", executable, parameters, directory, SW_SHOWNORMAL);
+        if (reinterpret_cast<INT_PTR>(result) <= 32) DeleteFileW(selectionFile);
         return reinterpret_cast<INT_PTR>(result) > 32 ? S_OK : HRESULT_FROM_WIN32(ERROR_OPEN_FAILED);
     }
     IFACEMETHODIMP GetFlags(EXPCMDFLAGS *flags) override
     {
         if (!flags) return E_POINTER;
         *flags = m_kind == CommandKind::Root ? ECF_HASSUBCOMMANDS : ECF_DEFAULT;
+        writeDiagnostic(L"GetFlags", m_kind, m_selection);
         return S_OK;
     }
     IFACEMETHODIMP EnumSubCommands(IEnumExplorerCommand **commands) override
@@ -227,16 +377,24 @@ public:
         if (!commands) return E_POINTER;
         *commands = nullptr;
         if (m_kind != CommandKind::Root) return E_NOTIMPL;
-        auto *enumerator = new (std::nothrow) CommandEnumerator(enabledCommands());
+        auto enabled = enabledCommands();
+        writeDiagnostic(enabled.empty() ? L"EnumSubCommands(empty)" : L"EnumSubCommands",
+                        m_kind, m_selection);
+        auto *enumerator = new (std::nothrow) CommandEnumerator(std::move(enabled), m_selection);
         if (!enumerator) return E_OUTOFMEMORY;
         *commands = enumerator;
         return S_OK;
     }
 
 private:
-    ~ExplorerCommand() { InterlockedDecrement(&g_objectCount); }
+    ~ExplorerCommand()
+    {
+        if (m_selection) m_selection->Release();
+        InterlockedDecrement(&g_objectCount);
+    }
     LONG m_refs = 1;
     CommandKind m_kind;
+    IShellItemArray *m_selection = nullptr;
 };
 
 IFACEMETHODIMP CommandEnumerator::Next(ULONG count, IExplorerCommand **commands, ULONG *fetched)
@@ -245,8 +403,9 @@ IFACEMETHODIMP CommandEnumerator::Next(ULONG count, IExplorerCommand **commands,
     if (count > 1 && !fetched) return E_POINTER;
     ULONG produced = 0;
     while (produced < count && m_index < m_commands.size()) {
-        commands[produced] = new (std::nothrow) ExplorerCommand(m_commands[m_index]);
+        commands[produced] = new (std::nothrow) ExplorerCommand(m_commands[m_index], m_selection);
         if (!commands[produced]) break;
+        writeDiagnostic(L"Enumerator.Next", m_commands[m_index], m_selection);
         ++produced;
         ++m_index;
     }

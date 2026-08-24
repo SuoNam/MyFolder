@@ -26,6 +26,7 @@ struct RelayDownloadTask
     QString destinationPath;
     qint64 totalBytes = 0;
     qint64 verifiedBytes = 0;
+    qint64 reportedBytes = 0;
     QString state;
     QString error;
     QList<RelayDownloadFile> files;
@@ -90,6 +91,7 @@ signals:
     void taskDownloadCompleted(const QString &forwardId, qint64 totalBytes);
     void taskDownloadFailed(const QString &forwardId, const QString &code,
                             const QString &message);
+    void authenticationRequired();
 
 private:
     void processQueue();

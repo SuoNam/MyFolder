@@ -1,126 +1,46 @@
-﻿# MyFolder PC Client
+# MyFolder PC Client v1.1.1
 
-**MyFolder PC Client 是基于 Qt 6 / QML 的 Windows 桌面客户端。** 它负责设备身份维护、设备间文件发送、传输任务管理以及 Windows Shell 集成，并与 MyFolder Server v1.1.1 和 Web 控制台协同工作。
+Qt 6 / QML 桌面客户端，已对接 MyFolder Server v1.1.1。
 
-> 当前版本：**v1.1.1**  
-> 官网：<https://myfolder.com.cn>  
-> API：<https://api.myfolder.com.cn>
+## 服务端地址
 
-## 客户端能力
+- 默认正式环境：`https://api.myfolder.com.cn`
+- 测试环境：启动前设置环境变量 `MYFOLDER_BASE_URL=https://test.myfolder.com.cn`
+- `Authorization` 直接传 JWT，不添加 `Bearer` 前缀。
 
-### 设备与账号
+## 已接入功能
 
-- MyFolder 设备注册、设备身份识别和心跳维护
-- 设备列表、设备状态和目标设备选择
-- 账号密码登录、会话刷新和退出登录
-- Nyauth、Google、GitHub OAuth 提供方状态查询与登录
-- OAuth 桌面端回调协议：`myfolder://oauth/callback`
-- 会话信息和本地任务状态持久化
+- `/user/login`、`/user/signup`：登录与注册。
+- `/api/v1/devices`：PC 设备注册、设备令牌、设备列表和心跳。
+- `/api/v1/transfers/tasks/*`：4 MiB 分片上传、逐块 SHA-256、整文件 SHA-256、断点续传、文件完成和任务完成。
+- `/api/v1/forwards/*`：创建、接受、开始、进度、P2P 信令、完成、失败和取消转发。
+- `/device`：WSS 实时设备列表、心跳和转发事件。
+- `/api/v1/forwards/{id}/files/content`：接收端 Range 分段下载、续传和 SHA-256 校验。
+- `/file/downloadfile`：服务器文件下载。
 
-### 文件传输
+“发送给设备”按 `LAN → P2P → RELAY` 选择真实通道。LAN 使用客户端 TCP V2 协议；P2P 使用 libdatachannel 的 ICE/STUN 与 DTLS/SCTP DataChannel；直连失败时自动取消原任务并转入 RELAY。
 
-- 选择一个或多个文件发送到其他 MyFolder 设备
-- 自动传输通道：`LAN → P2P → Server Relay`
-- LAN 局域网直传
-- P2P / STUN 连接探测和协商
-- 直连不可用时上传到 Server 并由目标设备下载
-- 分片上传、断点续传、Range 下载和失败重试
-- SHA-256 完整性校验
-- 传输进度、任务状态、失败信息和接收通知
-- WebSocket 设备通信与实时事件
+## 构建
 
-### Windows 集成
+需要 Qt 6.8 或更高版本、CMake、C++17、vcpkg 与 `libdatachannel`，以及以下 Qt 模块：
 
-- 文件资源管理器右键“发送到 MyFolder”
-- Windows Shell Extension 项目
-- 自定义 `myfolder://` URL 协议
-- 单实例启动和外部命令转发
-- Inno Setup 安装脚本
-- MSIX / AppX 相关打包配置
+- Quick
+- QuickControls2
+- Core
+- Network
+- WebSockets
+- Widgets
 
-## 分支与服务
+不再依赖 CURL；旧的 `ftp.cpp`、`ftp.h` 仅作为历史文件保留，不参与构建。
 
-当前客户端源码位于 GitHub 的 [`client` 分支](https://github.com/SuoNam/MyFolder/tree/client)。服务端源码和 Web v1.1.1 生产构建产物位于 [`main` 分支](https://github.com/SuoNam/MyFolder/tree/main)。
-
-在线入口：
-
-- 官网：<https://myfolder.com.cn>
-- Web 控制台：<https://web.myfolder.com.cn>
-- API：<https://api.myfolder.com.cn>
-
-默认 API 地址由 [`serverconfig.h`](serverconfig.h) 提供，可通过环境变量覆盖：
-
-```text
-MYFOLDER_BASE_URL=https://api.myfolder.com.cn
+```bash
+vcpkg install libdatachannel:x64-mingw-static
+cmake -B build -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_TOOLCHAIN_FILE=G:/vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -DVCPKG_TARGET_TRIPLET=x64-mingw-static
+cmake --build build --config Release
 ```
 
-## 环境要求
+`vcpkg.json` 已锁定原生 P2P 依赖。普通 CTest 不运行依赖本机 UDP/防火墙条件的 ICE 网络测试；允许本机 UDP 回环后可加 `-DMYFOLDER_ENABLE_P2P_NETWORK_TESTS=ON` 显式启用。
 
-- Windows 10/11 x64
-- Qt 6.8 或更高版本
-- CMake 3.16 或更高版本
-- 支持 C++17 的编译器
-- Qt 组件：Quick、QuickControls2、Core、Network、WebSockets、Widgets
-
-CMake 工程已经声明项目版本 `1.1.1`，并将版本号编译进桌面应用。
-
-## Windows 构建
-
-在安装 Qt、CMake 和对应编译器后，在客户端源码根目录执行：
-
-```powershell
-cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
-cmake --build build-release --config Release
-```
-
-也可以在 Qt Creator 中直接打开根目录的 `CMakeLists.txt`，选择 Qt 6.8+ Desktop Kit 后构建。
-
-构建目标包括：
-
-- `appMyFolder`：MyFolder 桌面应用
-- `MyFolderShellExtension`：Windows Shell Extension（仅 Windows）
-
-## 打包
-
-仓库保留以下打包相关内容：
-
-- `packaging/windows/`：AppX、现代右键菜单和 Windows 打包配置
-- `installer/`：Inno Setup 安装脚本
-- `Icons/`：应用图标资源
-- `app.rc`：Windows 应用资源
-
-推荐先构建 Release，再使用 `packaging/windows/` 或 `installer/` 中的脚本制作安装包。已生成的安装包不作为源码提交；正式安装包应通过 GitHub Releases 或官网分发。
-
-## 源码结构
-
-```text
-.
-├── *.cpp / *.h             # 设备、HTTP、WebSocket、传输和 Windows 集成功能
-├── *.qml                   # 主界面、设备、传输、设置和组件界面
-├── CMakeLists.txt          # Qt / CMake 构建定义
-├── serverconfig.h          # API 地址配置
-├── packaging/windows/      # Windows 打包与 Shell 配置
-├── installer/              # Inno Setup 安装脚本
-└── Icons/                  # 应用图标
-```
-
-## 与 Server 的兼容性
-
-本客户端按 MyFolder Server v1.1.1 的接口和传输协议实现。服务端的 API、上传协议和部署文档位于 `main/server/docs/`。
-
-如果使用自建服务端，可以通过 `MYFOLDER_BASE_URL` 指向自己的 API 地址；生产环境应使用 HTTPS，并确保 WebSocket 能够完成安全升级（WSS）。
-
-## 安全提示
-
-- 不要在源码中写入账号密码、JWT、OAuth Client Secret 或其他生产凭据。
-- 仅从可信来源安装客户端，并在发布页核对版本和哈希。
-- 自建服务时，应为 API、Web 控制台和 OAuth 回调配置正确的 HTTPS 域名。
-- 提交 Issue 或日志前，请删除令牌、文件路径、账号和服务器信息。
-
-## 反馈与贡献
-
-欢迎通过 [GitHub Issues](https://github.com/SuoNam/MyFolder/issues) 报告问题或提出建议。请在问题中说明客户端版本、Windows 版本、复现步骤以及经过脱敏的日志。
-
-## 许可证
-
-当前仓库尚未声明开源许可证。在许可证文件发布前，源码的复制、修改与再分发权限不作默认授权。
+QML 模块 URI 为 `MyTest`，入口为 `engine.loadFromModule("MyTest", "Main")`。

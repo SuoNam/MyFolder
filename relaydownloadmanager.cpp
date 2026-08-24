@@ -12,6 +12,7 @@
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QSettings>
 #include <QSharedPointer>
 #include <QStandardPaths>
 #include <QTimer>
@@ -21,6 +22,8 @@ namespace {
 constexpr int RequestTimeoutMs = 30000;
 constexpr int MaxNetworkRetries = 5;
 constexpr int MaxLocalRecoveries = 1;
+constexpr qint64 ProgressReportBytes = 8 * 1024 * 1024;
+constexpr qint64 ProgressReportIntervalMs = 1000;
 
 struct RangeContext
 {
@@ -29,6 +32,8 @@ struct RangeContext
     QString protocolError;
     qint64 offset = 0;
     qint64 expectedSize = 0;
+    qint64 lastReportedBytes = 0;
+    qint64 lastReportedAtMs = 0;
     bool headersChecked = false;
     bool accepted = false;
 };
@@ -38,12 +43,15 @@ RelayDownloadManager::RelayDownloadManager(QObject *parent)
     : QObject(parent)
 {
     setBaseUrl(MyFolderServerConfig::baseUrl());
-    QString defaultRoot = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
-    if (defaultRoot.isEmpty()) {
-        defaultRoot = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString configuredRoot = QSettings().value("transfer/receiveRoot").toString().trimmed();
+    if (configuredRoot.isEmpty()) {
+        configuredRoot = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+        if (configuredRoot.isEmpty()) {
+            configuredRoot = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        }
+        configuredRoot = QDir(configuredRoot).filePath("MyFolder");
     }
-    setReceiveRoot(QDir(defaultRoot).filePath("MyFolder"));
-    QDir().mkpath(m_receiveRoot);
+    setReceiveRoot(configuredRoot);
     loadTasks();
 }
 
@@ -79,7 +87,14 @@ void RelayDownloadManager::setCurrentDeviceToken(const QString &deviceToken)
 
 void RelayDownloadManager::setReceiveRoot(const QString &receiveRoot)
 {
-    const QString normalized = QDir::cleanPath(receiveRoot.trimmed());
+    const QString trimmed = receiveRoot.trimmed();
+    if (trimmed.isEmpty()) return;
+    const QString normalized = QDir(trimmed).absolutePath();
+    if (!QDir().mkpath(normalized)) {
+        setLastError(tr("Cannot create the receive directory"));
+        return;
+    }
+    QSettings().setValue("transfer/receiveRoot", normalized);
     if (m_receiveRoot == normalized) return;
     m_receiveRoot = normalized;
     emit receiveRootChanged();
@@ -92,7 +107,7 @@ QVariantList RelayDownloadManager::downloads() const
         QVariantMap item{{"forwardId", task.forwardId},
                          {"destinationPath", task.destinationPath},
                          {"totalBytes", task.totalBytes},
-                         {"verifiedBytes", task.verifiedBytes},
+                         {"verifiedBytes", qMax(task.verifiedBytes, task.reportedBytes)},
                          {"state", task.state},
                          {"error", task.error}};
         result.append(item);
@@ -120,6 +135,8 @@ bool RelayDownloadManager::startTask(const QVariantMap &taskMap)
     task.forwardId = forwardId;
     task.destinationPath = destinationPath;
     task.totalBytes = taskMap.value("totalBytes").toLongLong();
+    task.reportedBytes = qBound<qint64>(0, taskMap.value("transferredBytes").toLongLong(),
+                                       task.totalBytes);
     task.state = "PENDING";
     qint64 manifestBytes = 0;
     QSet<QString> paths;
@@ -352,6 +369,8 @@ void RelayDownloadManager::beginRangeDownload(RelayDownloadTask &task, RelayDown
     }
     context->offset = context->file->size();
     context->expectedSize = file.size;
+    context->lastReportedBytes = qMax(task.reportedBytes, task.verifiedBytes + context->offset);
+    context->lastReportedAtMs = QDateTime::currentMSecsSinceEpoch();
     if (!context->file->seek(context->offset)) {
         context->file->close();
         failTask("STORAGE_ERROR", tr("Cannot seek partial file"));
@@ -408,6 +427,22 @@ void RelayDownloadManager::beginRangeDownload(RelayDownloadTask &task, RelayDown
             if (context->file->write(data) != data.size()) {
                 context->protocolError = tr("Cannot write partial file");
                 m_reply->abort();
+                return;
+            }
+            if (!m_activeForwardId.isEmpty() && m_tasks.contains(m_activeForwardId)) {
+                RelayDownloadTask &active = m_tasks[m_activeForwardId];
+                const qint64 progress = qMin(active.totalBytes,
+                                             active.verifiedBytes + context->file->pos());
+                const qint64 now = QDateTime::currentMSecsSinceEpoch();
+                if (progress > active.reportedBytes
+                    && (progress - context->lastReportedBytes >= ProgressReportBytes
+                        || now - context->lastReportedAtMs >= ProgressReportIntervalMs)) {
+                    active.reportedBytes = progress;
+                    context->lastReportedBytes = progress;
+                    context->lastReportedAtMs = now;
+                    emit downloadsChanged();
+                    emit progressReady(active.forwardId, progress);
+                }
             }
         } else {
             context->errorBody.append(data);
@@ -441,6 +476,12 @@ void RelayDownloadManager::beginRangeDownload(RelayDownloadTask &task, RelayDown
         RelayDownloadFile &file = task.files[task.currentFileIndex];
         const QJsonObject error = parseError(context->errorBody);
         const QString code = error.value("code").toString();
+        if (status == 401) {
+            task.error = tr("登录状态正在恢复");
+            emit authenticationRequired();
+            scheduleNetworkRetry();
+            return;
+        }
         if (status == 416 || code == "RANGE_NOT_SATISFIABLE") {
             if (file.recoveryCount++ < MaxLocalRecoveries && archivePartFile(file.partPath)) {
                 saveTasks();
@@ -492,6 +533,7 @@ void RelayDownloadManager::finishCurrentFile()
     }
     file.completed = true;
     task.verifiedBytes += file.size;
+    task.reportedBytes = qMax(task.reportedBytes, task.verifiedBytes);
     ++task.currentFileIndex;
     saveTasks();
     emit downloadsChanged();
@@ -683,6 +725,7 @@ void RelayDownloadManager::saveTasks()
                                  {"destinationPath", task.destinationPath},
                                  {"totalBytes", task.totalBytes},
                                  {"verifiedBytes", task.verifiedBytes},
+                                 {"reportedBytes", task.reportedBytes},
                                  {"state", task.state}, {"error", task.error},
                                  {"finalizationRetryCount", task.finalizationRetryCount},
                                  {"files", files}});
@@ -706,6 +749,7 @@ void RelayDownloadManager::loadTasks()
         task.destinationPath = object.value("destinationPath").toString();
         task.totalBytes = object.value("totalBytes").toInteger();
         task.verifiedBytes = object.value("verifiedBytes").toInteger();
+        task.reportedBytes = qMax(task.verifiedBytes, object.value("reportedBytes").toInteger());
         task.state = object.value("state").toString();
         task.error = object.value("error").toString();
         task.finalizationRetryCount = object.value("finalizationRetryCount").toInt();

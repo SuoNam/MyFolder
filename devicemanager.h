@@ -9,6 +9,9 @@
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 
+class QHostAddress;
+class DeviceManagerTest;
+
 class DeviceManager : public QObject
 {
     Q_OBJECT
@@ -19,6 +22,7 @@ class DeviceManager : public QObject
     Q_PROPERTY(QString deviceId READ deviceId NOTIFY deviceIdentityChanged)
     Q_PROPERTY(QString deviceName READ deviceName NOTIFY deviceIdentityChanged)
     Q_PROPERTY(QString deviceToken READ deviceToken NOTIFY credentialsChanged)
+    Q_PROPERTY(int listenPort READ listenPort WRITE setListenPort NOTIFY listenPortChanged)
     Q_PROPERTY(QVariantList devices READ devices NOTIFY devicesChanged)
     Q_PROPERTY(bool registered READ registered NOTIFY registeredChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
@@ -32,6 +36,7 @@ public:
     QString deviceId() const { return m_deviceId; }
     QString deviceName() const { return m_deviceName; }
     QString deviceToken() const { return m_deviceToken; }
+    int listenPort() const { return m_listenPort; }
     QVariantList devices() const { return m_devices.toVariantList(); }
     bool registered() const { return m_registered; }
     bool busy() const { return m_pendingRequests > 0; }
@@ -39,19 +44,24 @@ public:
 
     void setBaseUrl(const QString &baseUrl);
     void setAuthToken(const QString &authToken);
+    void setListenPort(int listenPort);
 
     Q_INVOKABLE void start();
+    Q_INVOKABLE void restartSession();
     Q_INVOKABLE void stop(bool markOffline = false);
     Q_INVOKABLE void refreshDevices();
     Q_INVOKABLE void sendHeartbeat();
     Q_INVOKABLE void updateDeviceName(const QString &deviceName);
     Q_INVOKABLE void applyWebSocketDevices(const QJsonArray &devices);
+    Q_INVOKABLE QVariantMap reachableLanRoute(const QVariantList &targetAddresses) const;
+    Q_INVOKABLE QString reachableLanAddress(const QVariantList &targetAddresses) const;
 
 signals:
     void baseUrlChanged();
     void authTokenChanged();
     void deviceIdentityChanged();
     void credentialsChanged();
+    void listenPortChanged();
     void devicesChanged();
     void registeredChanged();
     void busyChanged();
@@ -61,6 +71,7 @@ signals:
     void deviceNameUpdateFinished(bool success, const QString &message);
 
 private:
+    friend class DeviceManagerTest;
     void registerDevice();
     void setDevices(const QJsonArray &devices);
     void setLastError(const QString &error);
@@ -70,7 +81,9 @@ private:
     QString credentialFilePath() const;
     QString loadStoredToken() const;
     bool saveStoredToken(const QString &token) const;
-    static QString localIpv4Address();
+    static QJsonArray localIpv4Addresses();
+    static QString primaryIpv4Address(const QJsonArray &addresses);
+    static bool isLanCandidateAddress(const QHostAddress &address);
     static QJsonObject parseObject(const QByteArray &data);
 
     QNetworkAccessManager m_network;
@@ -80,11 +93,14 @@ private:
     QString m_deviceId;
     QString m_deviceName;
     QString m_deviceToken;
+    int m_listenPort = 0;
     QJsonArray m_devices;
     QString m_lastError;
     int m_pendingRequests = 0;
     bool m_registered = false;
     bool m_stopping = false;
+    bool m_refreshInFlight = false;
+    bool m_heartbeatInFlight = false;
 };
 
 #endif

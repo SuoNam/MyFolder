@@ -15,6 +15,8 @@ ApplicationWindow {
     property string noticeMessage: ""
     property string mode: "login"
     property int codeCooldown: 0
+    property bool oauthPending: false
+    property string oauthProvider: ""
     // Keep the three configured providers visible even when the discovery
     // request is delayed or temporarily fails during application startup.
     property var oauthProviders: [
@@ -27,31 +29,57 @@ ApplicationWindow {
     property var workspaceWindow: null
     property var workspaceComponent: null
     property string queuedExternalAction: ""
-    property string queuedExternalFilePath: ""
+    property var queuedExternalPayload: []
+    property double lastSessionWatchdogAt: 0
+    property double lastRecoveryRequestAt: 0
+
+    function scheduleSessionRefresh() {
+        if (!root.workspaceWindow || GlobalStatus.authToken.length === 0) return
+        var expiresIn = Number(HttpHandler.accessTokenExpiresIn || 0)
+        var delay = expiresIn > 180 ? (expiresIn - 120) * 1000 : 90 * 60 * 1000
+        sessionRefresh.interval = Math.max(30000, delay)
+        sessionRefresh.restart()
+        root.lastSessionWatchdogAt = Date.now()
+    }
+
+    function requestSessionRecovery(reason) {
+        if (!root.workspaceWindow || !HttpHandler.hasStoredSession) return
+        var now = Date.now()
+        if (HttpHandler.refreshInFlight || now - root.lastRecoveryRequestAt < 3000) return
+        root.lastRecoveryRequestAt = now
+        sessionRefresh.stop()
+        sessionRetry.stop()
+        if (reason !== "scheduled" && reason !== "retry")
+            root.workspaceWindow.prepareForNetworkRecovery()
+        HttpHandler.refreshSession()
+    }
 
     function oauthParam(uri, name) {
         var match = new RegExp("[?&]" + name + "=([^&]+)").exec(uri)
         return match ? decodeURIComponent(match[1]) : ""
     }
 
-    function handleExternalCommand(action, filePath) {
+    function handleExternalCommand(action, payload) {
         if (action === "oauth-callback") {
+            var filePath = String(payload || "")
             var code = root.oauthParam(filePath, "code")
             if (code.length > 0) { root.isLoading = true; HttpHandler.exchangeOAuthCode(code) }
             else {
-                root.isLoading = false
-                root.errorMessage = root.oauthParam(filePath, "oauthErrorDescription") || qsTr("OAuth 登录未完成，请重试")
+                root.cancelOAuth(root.oauthParam(filePath, "oauthErrorDescription")
+                                 || root.oauthParam(filePath, "error_description")
+                                 || root.oauthParam(filePath, "error")
+                                 || qsTr("OAuth 登录未完成，请重试"))
             }
             root.show(); root.raise(); root.requestActivate()
             return
         }
         if (root.workspaceWindow) {
             root.workspaceWindow.show(); root.workspaceWindow.raise(); root.workspaceWindow.requestActivate()
-            if (action !== "activate") root.workspaceWindow.handleStartupAction(action, filePath)
+            if (action !== "activate") root.workspaceWindow.handleStartupAction(action, payload)
             return
         }
         root.queuedExternalAction = action
-        root.queuedExternalFilePath = filePath
+        root.queuedExternalPayload = payload
         root.show(); root.raise(); root.requestActivate()
     }
 
@@ -62,6 +90,9 @@ ApplicationWindow {
         DeviceManager.baseUrl = Config.baseUrl; DeviceManager.authToken = token
         ForwardManager.baseUrl = Config.baseUrl; ForwardManager.authToken = token
         RelayDownloadManager.baseUrl = Config.baseUrl; RelayDownloadManager.authToken = token
+        LanTransferManager.baseUrl = Config.baseUrl; LanTransferManager.authToken = token
+        P2pTransferManager.baseUrl = Config.baseUrl; P2pTransferManager.authToken = token
+        DeviceManager.listenPort = LanTransferManager.listenPort
     }
 
     function finishWorkspaceLoad() {
@@ -78,14 +109,15 @@ ApplicationWindow {
         root.workspaceWindow.logoutRequested.connect(root.returnToLogin)
         root.workspaceWindow.show(); root.workspaceLoaded = true
         var nextAction = root.queuedExternalAction.length > 0 ? root.queuedExternalAction : startupAction
-        var nextFile = root.queuedExternalAction.length > 0 ? root.queuedExternalFilePath : startupFilePath
-        if (nextAction !== "activate" && nextAction !== "oauth-callback") root.workspaceWindow.handleStartupAction(nextAction, nextFile)
-        root.queuedExternalAction = ""; root.queuedExternalFilePath = ""
-        DeviceManager.start(); sessionRefresh.start(); root.hide()
+        var nextPayload = root.queuedExternalAction.length > 0 ? root.queuedExternalPayload : startupFilePaths
+        if (nextAction !== "activate" && nextAction !== "oauth-callback") root.workspaceWindow.handleStartupAction(nextAction, nextPayload)
+        root.queuedExternalAction = ""; root.queuedExternalPayload = []
+        DeviceManager.start(); root.scheduleSessionRefresh(); root.hide()
     }
 
     function returnToLogin() {
         sessionRefresh.stop()
+        sessionRetry.stop()
         root.isLoading = false
         root.errorMessage = ""
         root.noticeMessage = qsTr("已退出登录")
@@ -102,7 +134,11 @@ ApplicationWindow {
 
     function enterWorkspace(token, userName) {
         root.applyAccessToken(token, userName)
-        if (root.workspaceWindow) { root.isLoading = false; return }
+        if (root.workspaceWindow) {
+            root.workspaceWindow.refreshRealtimeSession()
+            root.isLoading = false
+            return
+        }
         root.isLoading = true; root.errorMessage = ""
         GlobalStatus.dataFolder = DeviceIdentifier.setLocalFolder()
         workspaceLoadWatchdog.restart()
@@ -122,6 +158,26 @@ ApplicationWindow {
     function switchMode(next) {
         root.mode = next; root.errorMessage = ""; root.noticeMessage = ""
         passwordInput.text = ""; confirmInput.text = ""; codeInput.text = ""
+    }
+
+    function beginOAuth(provider) {
+        if (root.isLoading || root.oauthPending) return
+        root.errorMessage = ""
+        root.noticeMessage = ""
+        root.oauthProvider = provider
+        root.oauthPending = true
+        root.isLoading = true
+        oauthWatchdog.restart()
+        HttpHandler.startOAuth(provider)
+    }
+
+    function cancelOAuth(message) {
+        oauthWatchdog.stop()
+        root.oauthPending = false
+        root.oauthProvider = ""
+        root.isLoading = false
+        root.errorMessage = message || qsTr("第三方登录已取消，请重试")
+        root.show(); root.raise(); root.requestActivate()
     }
 
     function requestCode() {
@@ -150,16 +206,35 @@ ApplicationWindow {
 
     Connections {
         target: HttpHandler
-        function onSessionReady(accessToken, account) { root.enterWorkspace(accessToken, account) }
+        function onSessionReady(accessToken, account) {
+            oauthWatchdog.stop()
+            root.oauthPending = false
+            root.oauthProvider = ""
+            root.enterWorkspace(accessToken, account)
+            root.scheduleSessionRefresh()
+        }
         function onLoginResult(dataObj) { if (dataObj.status !== 200) root.acceptSession(dataObj) }
         function onSignupResult(dataObj) { if (dataObj.status !== 200) root.acceptSession(dataObj) }
         function onRefreshResult(dataObj) {
             if (dataObj.status !== 200) {
                 root.isLoading = false
-                if (!root.workspaceWindow) root.errorMessage = ""
+                if (!root.workspaceWindow) {
+                    root.errorMessage = ""
+                } else if (dataObj.status === 401) {
+                    HttpHandler.logout()
+                    root.returnToLogin()
+                    root.errorMessage = dataObj.message || qsTr("登录状态已失效，请重新登录")
+                } else {
+                    sessionRetry.restart()
+                }
             }
         }
-        function onOAuthExchangeResult(dataObj) { if (dataObj.status !== 200) root.acceptSession(dataObj) }
+        function onOauthExchangeResult(dataObj) {
+            oauthWatchdog.stop()
+            root.oauthPending = false
+            root.oauthProvider = ""
+            if (dataObj.status !== 200) root.acceptSession(dataObj)
+        }
         function onEmailCodeResult(dataObj) {
             root.isLoading = false
             if (dataObj.status === 200) { root.noticeMessage = qsTr("验证码已发送，10 分钟内有效"); root.codeCooldown = 60; cooldownTimer.start() }
@@ -170,25 +245,79 @@ ApplicationWindow {
             if (dataObj.status === 200 && root.mode === "forgot") { root.switchMode("login"); root.noticeMessage = qsTr("密码已重置，请重新登录") }
             else if (root.mode === "forgot") root.errorMessage = dataObj.message || qsTr("密码重置失败")
         }
-        function onOAuthProvidersResult(dataObj) {
+        function onOauthProvidersResult(dataObj) {
             if (dataObj.status === 200 && dataObj.data && dataObj.data.length > 0)
                 root.oauthProviders = dataObj.data
         }
-        function onOAuthStartResult(dataObj) {
+        function onOauthStartResult(dataObj) {
             if (dataObj.status === 200) {
-                // Leave the browser unobstructed while Google/GitHub/Nyauth
-                // displays account selection or consent. The custom protocol
-                // callback restores this window after the user finishes.
-                root.hide()
+                // Keep the login window available behind the browser so the
+                // user can cancel immediately after closing or abandoning OAuth.
+                root.noticeMessage = qsTr("已在浏览器中打开授权页面")
             } else {
-                root.isLoading = false
-                root.errorMessage = dataObj.message || qsTr("无法开始第三方登录")
+                root.cancelOAuth(dataObj.message || qsTr("无法开始第三方登录"))
             }
         }
     }
 
+    Connections {
+        target: DeviceManager
+        function onAuthenticationRequired() { root.requestSessionRecovery("device-401") }
+    }
+    Connections {
+        target: ForwardManager
+        function onAuthenticationRequired() { root.requestSessionRecovery("forward-401") }
+    }
+    Connections {
+        target: TransferManager
+        function onAuthenticationRequired() { root.requestSessionRecovery("upload-401") }
+    }
+    Connections {
+        target: RelayDownloadManager
+        function onAuthenticationRequired() { root.requestSessionRecovery("relay-401") }
+    }
+    Connections {
+        target: WebSocketClient
+        function onAuthenticationRequired() { root.requestSessionRecovery("websocket-401") }
+    }
+    Connections {
+        target: HttpHandler
+        function onAuthenticationRequired() { root.requestSessionRecovery("http-401") }
+    }
+
     Timer { id: cooldownTimer; interval: 1000; repeat: true; onTriggered: { root.codeCooldown--; if (root.codeCooldown <= 0) stop() } }
-    Timer { id: sessionRefresh; interval: 90 * 60 * 1000; repeat: true; onTriggered: HttpHandler.refreshSession() }
+    Timer {
+        id: oauthWatchdog
+        interval: 180000
+        repeat: false
+        onTriggered: root.cancelOAuth(qsTr("第三方登录已超时或被取消，请重试"))
+    }
+    Timer {
+        id: sessionRefresh
+        interval: 90 * 60 * 1000
+        repeat: false
+        onTriggered: root.requestSessionRecovery("scheduled")
+    }
+    Timer {
+        id: sessionRetry
+        interval: 5000
+        repeat: false
+        onTriggered: root.requestSessionRecovery("retry")
+    }
+    Timer {
+        id: sessionWatchdog
+        interval: 15000
+        repeat: true
+        running: root.workspaceWindow !== null && GlobalStatus.authToken.length > 0
+        triggeredOnStart: true
+        onTriggered: {
+            var now = Date.now()
+            var elapsed = root.lastSessionWatchdogAt > 0 ? now - root.lastSessionWatchdogAt : 0
+            root.lastSessionWatchdogAt = now
+            if (elapsed > 45000)
+                root.requestSessionRecovery("resume-or-network-gap")
+        }
+    }
     Component { id: workspaceWindowFactory; MainWindow {} }
     Timer {
         id: workspaceLoadWatchdog
@@ -247,10 +376,11 @@ ApplicationWindow {
                         Text { text:root.mode === "login" ? qsTr("欢迎回来") : root.mode === "signup" ? qsTr("创建账号") : qsTr("找回密码"); font.pixelSize:25; font.bold:true; color:Theme.ink }
                         Text { text:root.mode === "login" ? qsTr("登录一次，这台设备会长期保持会话。") : qsTr("通过邮箱验证码确认身份。"); font.pixelSize:12; color:Theme.muted }
                     }
-                    Rectangle {
-                        visible:root.errorMessage.length>0 || root.noticeMessage.length>0; Layout.fillWidth:true; implicitHeight:38; radius:6
-                        color:root.errorMessage.length>0?Theme.alertWash:Theme.signalWash; border.width:1; border.color:root.errorMessage.length>0?Theme.alertEdge:Theme.signalEdge
-                        Text { anchors.fill:parent; anchors.margins:10; text:root.errorMessage || root.noticeMessage; color:root.errorMessage.length>0?Theme.alert:Theme.signalDeep; font.pixelSize:11; elide:Text.ElideRight; verticalAlignment:Text.AlignVCenter }
+                    UiNotice {
+                        Layout.fillWidth: true
+                        message: root.errorMessage || root.noticeMessage
+                        tone: root.errorMessage.length > 0 ? "error" : "normal"
+                        onDismissed: { root.errorMessage = ""; root.noticeMessage = "" }
                     }
                     ColumnLayout {
                         Layout.fillWidth:true; spacing:6
@@ -281,7 +411,23 @@ ApplicationWindow {
                         visible:root.mode==="login"; Layout.fillWidth:true; spacing:6
                         Repeater {
                             model:root.oauthProviders
-                            UiButton { required property var modelData; Layout.fillWidth:true; text:modelData.provider==="nyauth"?"Nyauth":modelData.provider==="google"?"Google":"GitHub"; enabled:modelData.configured&&!root.isLoading; onClicked:{root.isLoading=true;HttpHandler.startOAuth(modelData.provider)} }
+                            UiButton { required property var modelData; Layout.fillWidth:true; text:modelData.provider==="nyauth"?"Nyauth":modelData.provider==="google"?"Google":"GitHub"; enabled:modelData.configured&&!root.isLoading&&!root.oauthPending; onClicked:root.beginOAuth(modelData.provider) }
+                        }
+                    }
+                    RowLayout {
+                        visible: root.mode === "login" && root.oauthPending
+                        Layout.fillWidth: true
+                        spacing: 8
+                        Text {
+                            Layout.fillWidth: true
+                            text: qsTr("等待浏览器授权回调…")
+                            color: Theme.muted
+                            font.pixelSize: 11
+                        }
+                        UiButton {
+                            kind: "quiet"
+                            text: qsTr("取消第三方登录")
+                            onClicked: root.cancelOAuth("")
                         }
                     }
                 }
