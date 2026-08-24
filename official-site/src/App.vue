@@ -46,8 +46,21 @@
       </div>
     </header>
 
+    <nav class="page-rail" aria-label="页面章节导航">
+      <a
+        v-for="(page, index) in pageSections"
+        :key="page.id"
+        :href="`#${page.id}`"
+        :class="{ 'is-active': activePageIndex === index }"
+        :aria-label="`前往${page.label}`"
+        :aria-current="activePageIndex === index ? 'step' : undefined"
+      >
+        <span>{{ page.label }}</span><i></i>
+      </a>
+    </nav>
+
     <main>
-      <section id="top" class="hero section-wrap">
+      <section id="top" class="hero section-wrap snap-page">
         <div class="hero-copy reveal">
           <div class="eyebrow"><span class="status-dot"></span> v1.1.1 · 现在可用</div>
           <h1>文件应该抵达设备，<br /><em>而不是困在应用里。</em></h1>
@@ -122,7 +135,7 @@
         </div>
       </section>
 
-      <section id="features" class="content-section section-wrap">
+      <section id="features" class="content-section section-wrap snap-page">
         <div class="section-heading reveal">
           <span class="section-index">01 / PRODUCT</span>
           <div>
@@ -147,7 +160,7 @@
         </div>
       </section>
 
-      <section id="how-it-works" class="route-section">
+      <section id="how-it-works" class="route-section snap-page">
         <div class="section-wrap">
           <div class="section-heading section-heading-light reveal">
             <span class="section-index">02 / ROUTING</span>
@@ -188,7 +201,7 @@
         </div>
       </section>
 
-      <section id="security" class="content-section section-wrap security-section">
+      <section id="security" class="content-section section-wrap security-section snap-page">
         <div class="security-visual reveal">
           <div class="security-grid-lines"></div>
           <div class="security-shield"><AppIcon name="shield" /></div>
@@ -218,7 +231,7 @@
         </div>
       </section>
 
-      <section id="download" class="download-section">
+      <section id="download" class="download-section snap-page">
         <div class="section-wrap download-layout">
           <div class="download-copy reveal">
             <span class="section-index">04 / GET MYFOLDER</span>
@@ -255,7 +268,7 @@
         </div>
       </section>
 
-      <section class="open-source-section section-wrap reveal">
+      <section id="open-source" class="open-source-section section-wrap reveal snap-page">
         <div>
           <span class="section-index">BUILD IN THE OPEN</span>
           <h2>源码、协议与版本记录，<br />都在同一个仓库。</h2>
@@ -300,8 +313,18 @@ const themeCurtainTone = ref('to-dark')
 const siteShell = ref(null)
 const scrollProgress = ref(0)
 const activeRouteIndex = ref(0)
+const activePageIndex = ref(0)
 const transferProgress = ref(18)
 const currentYear = new Date().getFullYear()
+
+const pageSections = [
+  { id: 'top', label: '首页' },
+  { id: 'features', label: '产品' },
+  { id: 'how-it-works', label: '路由' },
+  { id: 'security', label: '安全' },
+  { id: 'download', label: '下载' },
+  { id: 'open-source', label: '开源' },
+]
 
 const features = [
   {
@@ -359,6 +382,27 @@ function resetPointer() {
   siteShell.value?.classList.remove('has-pointer')
 }
 
+function handleWheel(event) {
+  if (window.innerWidth <= 900 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+
+  const direction = Math.sign(event.deltaY)
+  if (!direction) return
+  const nextIndex = activePageIndex.value + direction
+  if (nextIndex < 0 || nextIndex >= pageSections.length) return
+
+  event.preventDefault()
+  wheelAccumulator += event.deltaY
+  if (wheelLocked || Math.abs(wheelAccumulator) < 28) return
+
+  wheelLocked = true
+  wheelAccumulator = 0
+  activePageIndex.value = nextIndex
+  document.getElementById(pageSections[nextIndex].id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  window.clearTimeout(wheelUnlockTimer)
+  wheelUnlockTimer = window.setTimeout(() => { wheelLocked = false }, 820)
+}
+
 function applyTheme(nextDark) {
   darkMode.value = nextDark
   document.documentElement.dataset.theme = nextDark ? 'dark' : 'light'
@@ -397,7 +441,11 @@ function toggleTheme(event) {
 }
 
 let observer
+let pageObserver
 let transferTimer
+let wheelUnlockTimer
+let wheelLocked = false
+let wheelAccumulator = 0
 onMounted(() => {
   const savedTheme = localStorage.getItem('myfolder-theme')
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -406,6 +454,7 @@ onMounted(() => {
 
   updateScroll()
   window.addEventListener('scroll', updateScroll, { passive: true })
+  window.addEventListener('wheel', handleWheel, { passive: false })
 
   observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
@@ -413,6 +462,16 @@ onMounted(() => {
     })
   }, { threshold: 0.12 })
   document.querySelectorAll('.reveal').forEach((element) => observer.observe(element))
+
+  pageObserver = new IntersectionObserver((entries) => {
+    const visiblePage = entries
+      .filter((entry) => entry.isIntersecting)
+      .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0]
+    if (!visiblePage) return
+    const index = pageSections.findIndex((page) => page.id === visiblePage.target.id)
+    if (index >= 0) activePageIndex.value = index
+  }, { threshold: [0.22, 0.4, 0.62] })
+  document.querySelectorAll('.snap-page').forEach((element) => pageObserver.observe(element))
 
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     transferTimer = window.setInterval(() => {
@@ -427,7 +486,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', updateScroll)
+  window.removeEventListener('wheel', handleWheel)
   window.clearInterval(transferTimer)
+  window.clearTimeout(wheelUnlockTimer)
   observer?.disconnect()
+  pageObserver?.disconnect()
 })
 </script>
