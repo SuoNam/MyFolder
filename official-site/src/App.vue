@@ -383,24 +383,30 @@ function resetPointer() {
 }
 
 function handleWheel(event) {
-  if (window.innerWidth <= 900 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (window.innerWidth <= 900) return
   if (event.ctrlKey || event.metaKey || event.altKey) return
 
   const direction = Math.sign(event.deltaY)
   if (!direction) return
-  const nextIndex = activePageIndex.value + direction
+  const currentScroll = window.scrollY
+  const currentIndex = pageSections.reduce((closestIndex, page, index) => {
+    const element = document.getElementById(page.id)
+    const closestElement = document.getElementById(pageSections[closestIndex].id)
+    if (!element || !closestElement) return closestIndex
+    return Math.abs(element.offsetTop - currentScroll) < Math.abs(closestElement.offsetTop - currentScroll) ? index : closestIndex
+  }, 0)
+  const nextIndex = currentIndex + direction
   if (nextIndex < 0 || nextIndex >= pageSections.length) return
 
   event.preventDefault()
-  wheelAccumulator += event.deltaY
-  if (wheelLocked || Math.abs(wheelAccumulator) < 28) return
+  if (wheelLocked) return
 
   wheelLocked = true
-  wheelAccumulator = 0
   activePageIndex.value = nextIndex
-  document.getElementById(pageSections[nextIndex].id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  document.getElementById(pageSections[nextIndex].id)?.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' })
   window.clearTimeout(wheelUnlockTimer)
-  wheelUnlockTimer = window.setTimeout(() => { wheelLocked = false }, 820)
+  wheelUnlockTimer = window.setTimeout(() => { wheelLocked = false }, prefersReducedMotion ? 420 : 820)
 }
 
 function applyTheme(nextDark) {
@@ -445,7 +451,6 @@ let pageObserver
 let transferTimer
 let wheelUnlockTimer
 let wheelLocked = false
-let wheelAccumulator = 0
 onMounted(() => {
   const savedTheme = localStorage.getItem('myfolder-theme')
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches

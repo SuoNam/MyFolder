@@ -40,6 +40,10 @@
   html{scroll-padding-top:0;scroll-snap-type:y mandatory}
   body{overscroll-behavior-y:none}
   .snap-page{min-height:100svh;scroll-snap-align:start;scroll-snap-stop:always}
+  .route-section>.section-wrap{display:grid;min-height:100svh;align-content:center;padding-top:118px;padding-bottom:54px}
+  .route-section .section-heading{margin-bottom:38px}
+  .route-section .auto-route{margin-top:40px;padding:28px 36px}
+  .route-section .track-node{width:74px;height:74px}
   .open-source-section{align-content:center}
   .site-footer{scroll-snap-align:end;scroll-snap-stop:always}
   .page-rail{position:fixed;z-index:90;top:50%;right:22px;display:grid;gap:8px;transform:translateY(-50%)}
@@ -67,4 +71,3 @@
   .download-web h3{margin-top:45px}
 }
 @media(max-width:900px){.page-rail{display:none}}
-@media(prefers-reduced-motion:reduce){html{scroll-snap-type:none}}
