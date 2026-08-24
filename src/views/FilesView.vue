@@ -3,9 +3,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Icon from '@/components/Icon.vue'
 import SendSheet from '@/components/SendSheet.vue'
+import NoticeBanner from '@/components/NoticeBanner.vue'
 import { useFilesStore } from '@/stores/files'
 import { fileIcon, formatBytes, formatWhen } from '@/lib/format'
-import { getFolderAcl, listGroups, setFolderAcl, removeFolderAcl, toApiError, type FileEntry, type FolderAcl, type GroupMember, type FolderPermission } from '@/api'
+import { copyPrivatePathsToGroup, getFolderAcl, listGroups, listScopedFiles, movePrivatePathsToGroup, setFolderAcl, removeFolderAcl, toApiError, type FileEntry, type FolderAcl, type GroupMember, type FolderPermission, type StorageGroup } from '@/api'
 
 const files = useFilesStore()
 const route = useRoute()
@@ -31,6 +32,12 @@ const renameDraft = ref('')
 /** Move/copy sheet. */
 const transferMode = ref<'move' | 'copy' | null>(null)
 const destination = ref('')
+const destinationSpace = ref<'CURRENT' | 'GROUP'>('CURRENT')
+const writableGroups = ref<StorageGroup[]>([])
+const destinationGroup = ref<StorageGroup | null>(null)
+const groupDestinationPath = ref('')
+const groupDestinationEntries = ref<FileEntry[]>([])
+const groupDestinationLoading = ref(false)
 
 const transferVerb = computed(() => (transferMode.value === 'copy' ? '复制' : '移动'))
 const destinationOptions = computed(() =>
@@ -96,13 +103,60 @@ async function submitRename(entry: FileEntry) {
   if (await files.rename(entry, renameDraft.value)) renaming.value = ''
 }
 
-function openTransfer(mode: 'move' | 'copy') {
+async function openTransfer(mode: 'move' | 'copy') {
   transferMode.value = mode
+  destinationSpace.value = 'CURRENT'
+  destinationGroup.value = null
+  groupDestinationPath.value = ''
+  groupDestinationEntries.value = []
   destination.value = destinationOptions.value[0]?.path ?? ''
+  if (files.scopeType === 'PRIVATE') {
+    try {
+      writableGroups.value = (await listGroups()).filter((g) => g.myPermission === 'OWNER' || g.myPermission === 'WRITE')
+    } catch (e) { files.error = toApiError(e).message }
+  }
+}
+
+async function chooseGroup(group: StorageGroup) {
+  destinationSpace.value = 'GROUP'
+  destinationGroup.value = group
+  groupDestinationPath.value = ''
+  await loadGroupDestination()
+}
+
+async function loadGroupDestination(path = groupDestinationPath.value) {
+  if (!destinationGroup.value) return
+  groupDestinationLoading.value = true
+  try {
+    groupDestinationEntries.value = await listScopedFiles(path, 'GROUP', destinationGroup.value.groupId)
+    groupDestinationPath.value = path
+    files.error = ''
+  } catch (e) { files.error = toApiError(e).message }
+  finally { groupDestinationLoading.value = false }
+}
+
+function groupDestinationUp() {
+  const parts = groupDestinationPath.value.split('/').filter(Boolean)
+  parts.pop()
+  void loadGroupDestination(parts.join('/'))
 }
 
 async function submitTransfer() {
   if (!transferMode.value) return
+  if (destinationSpace.value === 'GROUP' && destinationGroup.value) {
+    try {
+      if (transferMode.value === 'copy') {
+        await copyPrivatePathsToGroup(files.selectedPaths, destinationGroup.value.groupId, groupDestinationPath.value)
+      } else {
+        await movePrivatePathsToGroup(files.selectedPaths, destinationGroup.value.groupId, groupDestinationPath.value)
+      }
+      files.clearSelection()
+      await files.refresh()
+      files.error = ''
+      transferMode.value = null
+    } catch (e) { files.error = toApiError(e).message }
+    return
+  }
   const ok = await files.transfer(files.selectedPaths, destination.value, transferMode.value)
   if (ok) transferMode.value = null
 }
@@ -161,9 +215,7 @@ watch(() => route.fullPath, openRoute)
       </div>
     </div>
 
-    <p v-if="files.error" class="sub" style="margin-bottom: 14px; color: var(--alert)" role="alert">
-      {{ files.error }}
-    </p>
+    <NoticeBanner :message="files.error" tone="error" @dismiss="files.error = ''" />
 
     <div class="card">
       <div class="card-head">
@@ -329,7 +381,7 @@ watch(() => route.fullPath, openRoute)
   <!-- Move / copy: the destination must be picked explicitly, and the store
        refuses any name that already exists there (the server would overwrite). -->
   <div v-if="transferMode" class="scrim" @click.self="transferMode = null">
-    <section class="sheet" role="dialog" aria-modal="true">
+    <section class="sheet" style="max-width: 620px" role="dialog" aria-modal="true">
       <div class="sheet-head">
         <p class="eyebrow">{{ transferMode === 'copy' ? 'Copy' : 'Move' }}</p>
         <h2 class="h2" style="margin-top: 7px">
@@ -340,26 +392,56 @@ watch(() => route.fullPath, openRoute)
         </p>
       </div>
       <div class="sheet-body">
-        <div v-if="!destinationOptions.length" class="empty" style="padding: 20px 0">
-          <div class="empty-title">没有可选的目标位置</div>
-          <p class="empty-sub sub">当前文件夹没有子文件夹，也没有上层目录可移动到。</p>
-        </div>
-        <div v-else class="picker">
-          <div
-            v-for="d in destinationOptions"
-            :key="d.path"
-            class="pick"
-            :class="{ 'is-picked': destination === d.path }"
-            @click="destination = d.path"
-          >
-            <Icon name="folder" />
-            <div style="min-width: 0">
-              <div class="pick-name">{{ d.name }}</div>
-              <div class="pick-meta mono">{{ d.path || '根目录' }}</div>
-            </div>
-            <span v-if="destination === d.path" class="pick-mark">✓</span>
+        <template v-if="files.scopeType === 'PRIVATE' && writableGroups.length">
+          <label class="label">目标文件区</label>
+          <div class="space-options">
+            <button class="space-option" :class="{ 'is-picked': destinationSpace === 'CURRENT' }" @click="destinationSpace = 'CURRENT'; destinationGroup = null">
+              <Icon name="folder" /><span><b>我的文件</b><small>私人文件区</small></span><span v-if="destinationSpace === 'CURRENT'" class="pick-mark">✓</span>
+            </button>
+            <button v-for="group in writableGroups" :key="group.groupId" class="space-option" :class="{ 'is-picked': destinationGroup?.groupId === group.groupId }" @click="chooseGroup(group)">
+              <Icon name="devices" /><span><b>{{ group.name }}</b><small>{{ group.myPermission === 'OWNER' ? '所有者' : '可读写' }}</small></span><span v-if="destinationGroup?.groupId === group.groupId" class="pick-mark">✓</span>
+            </button>
           </div>
-        </div>
+        </template>
+
+        <template v-if="destinationSpace === 'CURRENT'">
+          <label class="label" :style="writableGroups.length ? 'margin-top:16px' : ''">目标文件夹</label>
+          <div v-if="!destinationOptions.length" class="empty" style="padding: 20px 0">
+            <div class="empty-title">没有可选的目标位置</div>
+            <p class="empty-sub sub">当前文件夹没有子文件夹，也没有上层目录可移动到。</p>
+          </div>
+          <div v-else class="picker">
+            <div
+              v-for="d in destinationOptions"
+              :key="d.path"
+              class="pick"
+              :class="{ 'is-picked': destination === d.path }"
+              @click="destination = d.path"
+            >
+              <Icon name="folder" />
+              <div style="min-width: 0">
+                <div class="pick-name">{{ d.name }}</div>
+                <div class="pick-meta mono">{{ d.path || '根目录' }}</div>
+              </div>
+              <span v-if="destination === d.path" class="pick-mark">✓</span>
+            </div>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="destination-head">
+            <div><label class="label">群组目标文件夹</label><div class="mono destination-path">{{ destinationGroup?.name }} / {{ groupDestinationPath || '根目录' }}</div></div>
+            <button class="btn btn-sm" :disabled="!groupDestinationPath || groupDestinationLoading" @click="groupDestinationUp">上一级</button>
+          </div>
+          <div v-if="groupDestinationLoading" class="empty" style="padding:20px 0"><p class="sub">正在读取群组目录…</p></div>
+          <div v-else class="picker destination-folders">
+            <div v-for="entry in groupDestinationEntries.filter((entry) => entry.type === 'Directory')" :key="entry.path" class="pick" @click="loadGroupDestination(entry.path)">
+              <Icon name="folder" /><div><div class="pick-name">{{ entry.name }}</div><div class="pick-meta mono">点击进入</div></div><span class="pick-mark">›</span>
+            </div>
+            <div v-if="!groupDestinationEntries.some((entry) => entry.type === 'Directory')" class="empty" style="padding:18px"><div class="empty-title">当前文件夹没有子目录</div><p class="empty-sub sub">可以直接移动到这里。</p></div>
+          </div>
+          <p class="sub destination-tip">文件将移动到上方显示的当前群组文件夹。</p>
+        </template>
 
         <label class="label" style="margin-top: 16px">将要{{ transferVerb }}</label>
         <div class="picker">
@@ -378,7 +460,7 @@ watch(() => route.fullPath, openRoute)
         <div class="spacer" />
         <button
           class="btn btn-primary"
-          :disabled="!destinationOptions.length"
+          :disabled="destinationSpace === 'CURRENT' ? !destinationOptions.length : (!destinationGroup || groupDestinationLoading)"
           @click="submitTransfer"
         >
           <Icon name="transfer" />确认{{ transferVerb }}
@@ -399,7 +481,7 @@ watch(() => route.fullPath, openRoute)
     <section class="sheet" role="dialog" aria-modal="true">
       <div class="sheet-head"><p class="eyebrow">Folder access</p><h2 class="h2" style="margin-top:7px">当前目录权限</h2><p class="sub" style="margin-top:5px"><span class="mono">{{ files.cwd || '/' }}</span>；未设置时继承上级目录或群组默认权限。</p></div>
       <div class="sheet-body"><p v-if="aclError" class="sub" style="color:var(--alert)">{{ aclError }}</p><div class="picker">
-        <div v-for="member in groupMembers" :key="member.account" class="pick"><div><div class="pick-name">{{ member.displayName }}</div><div class="pick-meta mono">{{ member.account }}</div></div><div class="spacer" /><select v-model="aclDraft[member.account]" class="btn btn-sm"><option value="NONE">无权限</option><option value="READ">只读</option><option value="WRITE">可修改</option><option value="MANAGE">可管理</option></select><button class="btn btn-sm btn-primary" @click="savePermission(member.account)">保存</button><button class="btn btn-sm" @click="inheritPermission(member.account)">恢复继承</button></div>
+        <div v-for="member in groupMembers" :key="member.account" class="pick"><div><div class="pick-name">{{ member.displayName }}</div><div class="pick-meta mono">{{ member.account }}</div></div><div class="spacer" /><select v-model="aclDraft[member.account]" class="select-control select-sm"><option value="NONE">无权限</option><option value="READ">只读</option><option value="WRITE">可修改</option><option value="MANAGE">可管理</option></select><button class="btn btn-sm btn-primary" @click="savePermission(member.account)">保存</button><button class="btn btn-sm" @click="inheritPermission(member.account)">恢复继承</button></div>
       </div></div>
       <div class="sheet-foot"><div class="spacer" /><button class="btn" @click="showPermissions=false">完成</button></div>
     </section>

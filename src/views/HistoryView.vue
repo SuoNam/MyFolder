@@ -1,16 +1,7 @@
 <script setup lang="ts">
-/**
- * Transfer history.
- *
- * The server exposes no history endpoint (/api/v1/forwards/history and friends
- * all 404), so this page is assembled from two real sources:
- *   1. forwards currently in a terminal state, from GET /api/v1/forwards
- *   2. this browser's local job ledger in localStorage
- * Both are labelled, and the limitation is stated in the UI rather than hidden
- * behind invented rows.
- */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Icon from '@/components/Icon.vue'
+import NoticeBanner from '@/components/NoticeBanner.vue'
 import { useTransfersStore } from '@/stores/transfers'
 import { useDevicesStore } from '@/stores/devices'
 import { formatBytes, formatWhen } from '@/lib/format'
@@ -30,19 +21,20 @@ interface Row {
   bytes: number
   when: string
   result: '成功' | '失败' | '取消' | '等待'
-  source: '服务器' | '本地记录'
+  source: '服务器'
   note: string
 }
 
 const rows = computed<Row[]>(() => {
   const out: Row[] = []
 
-  for (const f of transfers.pastForwards) {
-    const peer = devices.byId(f.targetDeviceId)?.deviceName ?? f.targetDeviceId
+  for (const f of transfers.historyForwards.filter((item) => ['COMPLETED', 'CANCELLED', 'FAILED', 'REJECTED'].includes(item.state))) {
+    const source = devices.byId(f.sourceDeviceId)?.deviceName ?? f.sourceDeviceId
+    const target = devices.byId(f.targetDeviceId)?.deviceName ?? f.targetDeviceId
     out.push({
       key: `fw-${f.forwardId}`,
       name: f.files.length === 1 ? f.files[0].path : `${f.files.length} 个文件`,
-      flow: `本浏览器 → ${peer}`,
+      flow: `${source} → ${target}`,
       kind: '发送',
       bytes: f.totalBytes,
       when: f.updatedAt,
@@ -52,33 +44,20 @@ const rows = computed<Row[]>(() => {
     })
   }
 
-  // Local jobs whose forward is not in the server list (upload-only, failed
-  // before the forward existed, or a forward the server has already dropped).
-  const seen = new Set(transfers.pastForwards.map((f) => f.forwardId))
-  const live = new Set(transfers.liveForwards.map((f) => f.forwardId))
-  for (const j of transfers.doneJobs) {
-    if (j.forwardId && seen.has(j.forwardId)) continue
-
-    // A finished *upload* is not a finished *delivery*. While the forward is
-    // still live the transfer is pending, not successful — otherwise this page
-    // would contradict the 传输 page for the same transfer.
-    let result: Row['result']
-    if (j.phase === 'cancelled') result = '取消'
-    else if (j.phase === 'failed') result = '失败'
-    else if (j.kind === 'send' && j.forwardId && live.has(j.forwardId)) result = '等待'
-    else if (j.kind === 'send' && !j.forwardId) result = '失败'
-    else result = '成功'
-
+  for (const task of transfers.uploadHistory.filter((item) => {
+    const target = String(item.targetPath ?? '')
+    return target !== 'relay' && !target.startsWith('relay/') && ['COMPLETED', 'CANCELLED', 'FAILED'].includes(item.state)
+  })) {
     out.push({
-      key: `job-${j.id}`,
-      name: j.title,
-      flow: j.kind === 'send' ? `本浏览器 → ${j.targetName}` : `本浏览器 → 服务器 ${j.parentPath}`,
-      kind: j.kind === 'send' ? '发送' : '上传',
-      bytes: j.totalBytes,
-      when: j.updatedAt,
-      result,
-      source: '本地记录',
-      note: j.error || (result === '等待' ? '已上传，等待对方接收' : `${j.fileCount} 个文件`),
+      key: `upload-${task.uploadId}`,
+      name: task.files.length === 1 ? task.files[0].path : `${task.files.length} 个文件`,
+      flow: `账号设备 → 服务器 / ${task.targetPath || '根目录'}`,
+      kind: '上传',
+      bytes: task.totalBytes,
+      when: task.updatedAt,
+      result: task.state === 'COMPLETED' ? '成功' : task.state === 'CANCELLED' ? '取消' : '失败',
+      source: '服务器',
+      note: task.failureReason ?? `${task.files.length} 个文件`,
     })
   }
 
@@ -109,13 +88,10 @@ function exportCsv() {
 }
 
 onMounted(() => {
-  transfers.startPolling()
+  void transfers.refreshHistory()
   devices.startPolling()
 })
-onUnmounted(() => {
-  transfers.stopPolling()
-  devices.stopPolling()
-})
+onUnmounted(() => devices.stopPolling())
 </script>
 
 <template>
@@ -125,6 +101,7 @@ onUnmounted(() => {
       <input v-model="q" placeholder="搜索文件或设备" aria-label="搜索记录" />
     </div>
     <div class="spacer" />
+    <button class="btn" @click="transfers.refreshHistory()">刷新</button>
     <button class="btn" :class="{ 'btn-primary': onlyFailed }" @click="onlyFailed = !onlyFailed">
       仅看失败
     </button>
@@ -137,9 +114,11 @@ onUnmounted(() => {
     <div class="page-head">
       <div>
         <h1 class="h1">传输记录</h1>
-        <p class="sub">本浏览器发出的传输，以及服务器上仍保留状态的转发。</p>
+        <p class="sub">同一账号所有设备的客户端收发与服务器上传，统一从服务端读取。</p>
       </div>
     </div>
+
+    <NoticeBanner :message="transfers.historyError" tone="error" @dismiss="transfers.historyError = ''" />
 
     <div class="card">
       <div v-if="!rows.length" class="card-pad">
@@ -187,9 +166,7 @@ onUnmounted(() => {
       <div v-if="rows.length" class="card-head">
         <span class="sub">共 {{ rows.length }} 条</span>
         <div class="spacer" />
-        <span class="mono sub" style="font-size: 11px">
-          服务器未提供历史查询接口，仅能显示当前仍保留的转发状态与本浏览器的本地记录
-        </span>
+        <span class="mono sub" style="font-size: 11px">账号级服务端记录</span>
       </div>
     </div>
   </div>

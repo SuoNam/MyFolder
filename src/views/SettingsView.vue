@@ -8,6 +8,7 @@ import { useTransfersStore } from '@/stores/transfers'
 import { useFilesStore } from '@/stores/files'
 import {
   BASE_URL, getAccountProfile, getOAuthProviders, getStorageUsage, sendEmailCode, startOAuth, updateDisplayName,
+  updateTransferPreferences,
   unlinkOAuth, unregisterDevice, verifySensitive, toApiError,
   type AccountProfile, type OAuthProviderStatus, type StorageUsage,
 } from '@/api'
@@ -32,6 +33,7 @@ const bindingBusy = ref(false)
 const bindingError = ref('')
 const displayName = ref('')
 const nameBusy = ref(false)
+const preferenceBusy = ref(false)
 const storageUsage = ref<StorageUsage | null>(null)
 const storagePercent = computed(() => storageUsage.value?.limitBytes
   ? Math.min(100, storageUsage.value.usedBytes / storageUsage.value.limitBytes * 100) : 0)
@@ -45,6 +47,17 @@ async function saveDisplayName() {
     notice.value = '用户名已保存'
   } catch (e) { notice.value = toApiError(e).message }
   finally { nameBusy.value = false }
+}
+
+async function saveAutoAccept(event: Event) {
+  const enabled = (event.target as HTMLInputElement).checked
+  preferenceBusy.value = true
+  notice.value = ''
+  try {
+    profile.value = await updateTransferPreferences(enabled)
+    notice.value = '自动接收设置已保存'
+  } catch (e) { notice.value = toApiError(e).message }
+  finally { preferenceBusy.value = false }
 }
 
 async function retryRegister() {
@@ -217,6 +230,26 @@ onMounted(async () => {
         </section>
 
         <section class="card">
+          <div class="card-head"><h3 class="h3">接收文件</h3></div>
+          <div class="card-pad preference-row">
+            <div>
+              <b>自动接收其他设备的文件</b>
+              <p class="sub">此设置跟随账号，并同步到所有桌面客户端。</p>
+            </div>
+            <label class="switch" aria-label="自动接收其他设备的文件">
+              <input
+                type="checkbox"
+                role="switch"
+                :checked="profile?.autoAcceptDeviceTransfers === true"
+                :disabled="preferenceBusy"
+                @change="saveAutoAccept"
+              >
+              <span />
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
           <div class="card-head"><h3 class="h3">服务器</h3></div>
           <div class="card-pad">
             <label class="label">API 地址</label>
@@ -325,4 +358,5 @@ onMounted(async () => {
 <style scoped>
 .account-email{font-size:12px;color:var(--muted);margin:10px 0 12px}.oauth-bindings{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:5px 0;margin-bottom:12px}.oauth-binding-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0}.oauth-binding-row div{display:grid;gap:2px}.oauth-binding-row b{font-size:12px}.oauth-binding-row span{font-size:10px;color:var(--muted)}.bind-confirm{border:1px solid var(--line);background:var(--surface-2);padding:10px;margin-bottom:12px}.bind-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:8px}.binding-error{color:var(--alert);margin:-3px 0 10px}
 .account-name-label{display:block;margin-top:14px}.account-name-editor{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center;margin-top:6px}.account-id{font-size:11px;color:var(--faint);margin:8px 0 12px}
+.preference-row{display:flex;align-items:center;justify-content:space-between;gap:18px}.preference-row b{font-size:12px}.preference-row p{margin:4px 0 0}.switch{position:relative;display:inline-flex;width:40px;height:22px;flex:0 0 auto}.switch input{position:absolute;opacity:0;pointer-events:none}.switch span{width:40px;height:22px;border:1px solid var(--line);border-radius:11px;background:var(--sunken);transition:background .15s,border-color .15s}.switch span::after{content:"";display:block;width:16px;height:16px;margin:2px;border-radius:50%;background:var(--surface);border:1px solid var(--line);transition:transform .15s}.switch input:checked+span{background:var(--signal);border-color:var(--signal)}.switch input:checked+span::after{transform:translateX(18px);border-color:transparent}.switch input:focus-visible+span{outline:2px solid var(--focus);outline-offset:2px}.switch input:disabled+span{opacity:.55}
 </style>

@@ -38,12 +38,29 @@ export function clearCredentials() {
   deviceToken = ''
 }
 
+http.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = axios.isAxiosError(error) ? error.response?.status : 0
+    const path = axios.isAxiosError(error) ? String(error.config?.url ?? '') : ''
+    const authRequest = path.startsWith('/user/login') || path.startsWith('/user/signup') ||
+      path.startsWith('/user/refresh') || path.startsWith('/user/oauth/')
+    if (status === 401 && authToken && !authRequest) {
+      authToken = ''
+      window.dispatchEvent(new CustomEvent('myfolder:session-expired'))
+    }
+    return Promise.reject(error)
+  },
+)
+
 http.interceptors.request.use((config) => {
   if (authToken) config.headers.Authorization = authToken
   const path = String(config.url ?? '')
   if (path.startsWith('/file/') || path.startsWith('/directory/')) {
-    config.headers['X-Storage-Scope'] = storageScope.type
-    if (storageScope.type === 'GROUP') config.headers['X-Storage-Scope-Id'] = storageScope.id
+    if (!config.headers['X-Storage-Scope']) config.headers['X-Storage-Scope'] = storageScope.type
+    if (!config.headers['X-Storage-Scope-Id'] && config.headers['X-Storage-Scope'] === 'GROUP') {
+      config.headers['X-Storage-Scope-Id'] = storageScope.id
+    }
   }
   return config
 })
@@ -146,12 +163,13 @@ export interface UploadTask {
   totalBytes: number
   createdAt: string
   updatedAt: string
+  failureReason: string | null
   files: UploadTaskFile[]
 }
 
 export type Channel = 'AUTO' | 'LAN' | 'P2P' | 'RELAY'
 export type ForwardState =
-  | 'OFFERED' | 'ACCEPTED' | 'TRANSFERRING' | 'COMPLETED' | 'CANCELLED' | 'FAILED'
+  | 'OFFERED' | 'ACCEPTED' | 'TRANSFERRING' | 'COMPLETED' | 'CANCELLED' | 'FAILED' | 'REJECTED'
 
 export interface ForwardFile { path: string; size: number; sha256: string }
 
@@ -189,7 +207,7 @@ export interface AuthSession {
 
 export interface OAuthProviderStatus { provider: 'nyauth' | 'google' | 'github'; configured: boolean }
 export interface OAuthBinding { provider: string; username: string | null; email: string | null; boundAt: string }
-export interface AccountProfile { account: string; displayName: string; email: string | null; emailVerified: boolean; oauthBindings: OAuthBinding[] }
+export interface AccountProfile { account: string; displayName: string; email: string | null; emailVerified: boolean; autoAcceptDeviceTransfers: boolean; oauthBindings: OAuthBinding[] }
 
 export type GroupPermission = 'READ' | 'WRITE' | 'OWNER'
 export interface GroupMember { account: string; displayName: string; permission: GroupPermission; joinedAt: string }
@@ -247,6 +265,11 @@ export async function updateDisplayName(displayName: string): Promise<AccountPro
   return unwrap(data)
 }
 
+export async function updateTransferPreferences(autoAcceptDeviceTransfers: boolean): Promise<AccountProfile> {
+  const { data } = await http.patch<Envelope<AccountProfile>>('/user/me/transfer-preferences', { autoAcceptDeviceTransfers })
+  return unwrap(data)
+}
+
 export async function getOAuthProviders(): Promise<OAuthProviderStatus[]> {
   const { data } = await http.get<Envelope<OAuthProviderStatus[]>>('/user/oauth/providers')
   return unwrap(data)
@@ -296,9 +319,14 @@ export async function deleteGroup(groupId: string): Promise<void> {
   unwrap(data)
 }
 
-export async function addGroupMember(groupId: string, account: string, permission: 'READ' | 'WRITE'): Promise<StorageGroup> {
-  const { data } = await http.post<Envelope<StorageGroup>>(`/api/v1/groups/${encodeURIComponent(groupId)}/members`, { account, permission })
+export async function addGroupMember(groupId: string, email: string, permission: 'READ' | 'WRITE'): Promise<StorageGroup> {
+  const { data } = await http.post<Envelope<StorageGroup>>(`/api/v1/groups/${encodeURIComponent(groupId)}/members`, { email, permission })
   return unwrap(data)
+}
+
+export async function leaveGroup(groupId: string): Promise<void> {
+  const { data } = await http.post<Envelope<null>>(`/api/v1/groups/${encodeURIComponent(groupId)}/leave`)
+  unwrap(data)
 }
 
 export async function updateGroupMember(groupId: string, account: string, permission: 'READ' | 'WRITE'): Promise<StorageGroup> {
@@ -336,6 +364,29 @@ export async function getStorageUsage(): Promise<StorageUsage> {
 export async function listFiles(directoryPath: string): Promise<FileEntry[]> {
   const { data } = await http.post<Envelope<FileEntry[]>>('/file/getfilelist', { directoryPath })
   return unwrap(data) ?? []
+}
+
+export async function listScopedFiles(directoryPath: string, type: 'PRIVATE' | 'GROUP', id = ''): Promise<FileEntry[]> {
+  const headers: Record<string, string> = { 'X-Storage-Scope': type }
+  if (type === 'GROUP') headers['X-Storage-Scope-Id'] = id
+  const { data } = await http.post<Envelope<FileEntry[]>>('/file/getfilelist', { directoryPath }, { headers })
+  return unwrap(data) ?? []
+}
+
+export async function movePrivatePathsToGroup(sourcePaths: string[], groupId: string, targetDirectory: string): Promise<void> {
+  const { data } = await http.post<Envelope<Envelope<string>[]>>('/file/move-to-group', {
+    sourcePaths, groupId, targetDirectory,
+  })
+  unwrap(data)
+}
+
+export async function copyPrivatePathsToGroup(sourcePaths: string[], groupId: string, targetDirectory: string): Promise<void> {
+  const { data } = await http.post<Envelope<Envelope<string>[]>>('/file/copy-to-group', {
+    groupId,
+    targetDirectory,
+    sourcePaths,
+  })
+  unwrap(data)
 }
 
 /** POST /file/createfolder {path} — the key is `path`, NOT `directoryPath`. */
@@ -596,6 +647,18 @@ export async function cancelUploadTask(uploadId: string): Promise<UploadTask> {
 
 export async function listForwards(): Promise<Forward[]> {
   const { data } = await http.get<Forward[]>('/api/v1/forwards', { headers: deviceHeaders() })
+  return Array.isArray(data) ? data : []
+}
+
+/** Account-wide ledger, including transfers performed by the user's other devices. */
+export async function listForwardHistory(): Promise<Forward[]> {
+  const { data } = await http.get<Forward[]>('/api/v1/forwards/history', { headers: deviceHeaders() })
+  return Array.isArray(data) ? data : []
+}
+
+/** Account-wide resumable uploads, used as the authoritative upload ledger. */
+export async function listUploadTasks(): Promise<UploadTask[]> {
+  const { data } = await http.get<UploadTask[]>('/api/v1/transfers/tasks')
   return Array.isArray(data) ? data : []
 }
 

@@ -3,9 +3,12 @@ import { defineStore } from 'pinia'
 import {
   cancelForward,
   createRelayForward,
+  listForwardHistory,
   listForwards,
+  listUploadTasks,
   toApiError,
   type Forward,
+  type UploadTask,
   type ForwardFile,
 } from '@/api'
 import { currentIdentity } from '@/lib/device'
@@ -90,8 +93,11 @@ function loadJobs(): Job[] {
 export const useTransfersStore = defineStore('transfers', () => {
   const jobs = ref<Job[]>(loadJobs())
   const forwards = ref<Forward[]>([])
+  const historyForwards = ref<Forward[]>([])
+  const uploadHistory = ref<UploadTask[]>([])
   const error = ref('')
   const forwardsError = ref('')
+  const historyError = ref('')
   const loadedOnce = ref(false)
 
   /** Live upload handles, keyed by job id. Not persisted. */
@@ -115,6 +121,7 @@ export const useTransfersStore = defineStore('transfers', () => {
 
   const activeJobs = computed(() => jobs.value.filter((j) => isActivePhase(j.phase)))
   const doneJobs = computed(() => jobs.value.filter((j) => !isActivePhase(j.phase)))
+  const failedJobs = computed(() => jobs.value.filter((j) => j.phase === 'failed'))
 
   /** Forwards this browser created. The server returns both directions. */
   const myForwards = computed(() => {
@@ -127,6 +134,9 @@ export const useTransfersStore = defineStore('transfers', () => {
   )
   const pastForwards = computed(() =>
     myForwards.value.filter((f) => ['COMPLETED', 'CANCELLED', 'FAILED', 'REJECTED'].includes(f.state)),
+  )
+  const failedForwards = computed(() =>
+    myForwards.value.filter((f) => f.state === 'FAILED' || f.state === 'REJECTED'),
   )
 
   const activeCount = computed(() => activeJobs.value.length + liveForwards.value.length)
@@ -148,6 +158,21 @@ export const useTransfersStore = defineStore('transfers', () => {
       forwardsError.value = toApiError(e).message
     } finally {
       loadedOnce.value = true
+    }
+  }
+
+  async function refreshHistory() {
+    if (!currentIdentity()) {
+      historyError.value = '此浏览器尚未注册为设备，无法读取账号传输记录'
+      return
+    }
+    try {
+      const [allForwards, allUploads] = await Promise.all([listForwardHistory(), listUploadTasks()])
+      historyForwards.value = allForwards
+      uploadHistory.value = allUploads
+      historyError.value = ''
+    } catch (e) {
+      historyError.value = toApiError(e).message
     }
   }
 
@@ -319,6 +344,9 @@ export const useTransfersStore = defineStore('transfers', () => {
     for (const h of handles.values()) h.cancel()
     handles.clear()
     forwards.value = []
+    historyForwards.value = []
+    uploadHistory.value = []
+    historyError.value = ''
     loadedOnce.value = false
   }
 
@@ -327,12 +355,17 @@ export const useTransfersStore = defineStore('transfers', () => {
     forwards,
     activeJobs,
     doneJobs,
+    failedJobs,
     myForwards,
     liveForwards,
     pastForwards,
+    failedForwards,
+    historyForwards,
+    uploadHistory,
     activeCount,
     error,
     forwardsError,
+    historyError,
     loadedOnce,
     forwardOf,
     enqueue,
@@ -341,6 +374,7 @@ export const useTransfersStore = defineStore('transfers', () => {
     removeJob,
     clearFinished,
     refreshForwards,
+    refreshHistory,
     startPolling,
     stopPolling,
     reset,

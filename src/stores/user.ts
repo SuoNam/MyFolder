@@ -25,6 +25,11 @@ export const useUserStore = defineStore('user', () => {
   const deviceError = ref('')
   let refreshTimer = 0
 
+  function redirectToLogin(reason = 'session-expired') {
+    const query = new URLSearchParams({ reason }).toString()
+    if (!window.location.pathname.startsWith('/login')) window.location.replace(`/login?${query}`)
+  }
+
   function persist() {
     localStorage.setItem(TOKEN_KEY, token.value)
     localStorage.setItem(REFRESH_KEY, refreshToken.value)
@@ -85,6 +90,7 @@ export const useUserStore = defineStore('user', () => {
       return true
     } catch {
       clearLocalSession()
+      redirectToLogin()
       return false
     }
   }
@@ -115,6 +121,11 @@ export const useUserStore = defineStore('user', () => {
     clearLocalSession()
     if (oldRefresh) void logoutAuth(oldRefresh).catch(() => undefined)
   }
+
+  window.addEventListener('myfolder:session-expired', () => {
+    clearLocalSession()
+    redirectToLogin()
+  })
 
   return {
     account, email, token, refreshToken, isLogin, busy, error, deviceReady, deviceError,

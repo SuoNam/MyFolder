@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import Icon from '@/components/Icon.vue'
+import NoticeBanner from '@/components/NoticeBanner.vue'
 import {
   FORWARD_LABEL,
   PHASE_LABEL as phaseLabel,
@@ -37,6 +38,22 @@ function progClass(j: Job): string {
   return 'is-relay'
 }
 
+function failureInChinese(reason?: string | null): string {
+  const raw = String(reason ?? '').trim()
+  if (!raw) return '传输失败，服务端未返回具体原因'
+  const upper = raw.toUpperCase()
+  if (upper.includes('HASH') || upper.includes('SHA-256')) return '文件校验失败，文件内容可能已发生变化'
+  if (upper.includes('TIMEOUT') || upper.includes('TIMED OUT')) return '连接超时，对方设备可能离线或网络不可达'
+  if (upper.includes('SOURCE_CHANGED')) return '源文件在传输过程中发生了变化'
+  if (upper.includes('AUTH') || upper.includes('UNAUTHORIZED')) return '身份验证失败，请重新登录后重试'
+  if (upper.includes('PERMISSION') || upper.includes('ACCESS DENIED')) return '没有读取源文件或写入目标目录的权限'
+  if (upper.includes('STORAGE') || upper.includes('DISK') || upper.includes('NO SPACE')) return '目标存储空间不足或无法写入文件'
+  if (upper.includes('NETWORK') || upper.includes('CONNECTION') || upper.includes('CHANNEL')) return '网络连接中断，无法继续传输'
+  if (upper.includes('NOT FOUND') || upper.includes('NO SUCH FILE')) return '源文件或传输任务已经不存在'
+  if (upper.includes('REJECT')) return '对方设备拒绝接收文件'
+  return /^[A-Z0-9_: -]+$/.test(raw) ? `传输失败，错误代码：${raw}` : raw
+}
+
 onMounted(() => {
   transfers.startPolling()
   devices.startPolling()
@@ -51,13 +68,6 @@ onUnmounted(() => {
   <header class="topbar">
     <div class="eyebrow">Live queue</div>
     <div class="spacer" />
-    <button
-      class="btn"
-      :disabled="!transfers.doneJobs.length"
-      @click="transfers.clearFinished()"
-    >
-      清除已结束
-    </button>
     <RouterLink to="/devices" class="btn btn-primary"><Icon name="send" />发送文件</RouterLink>
   </header>
 
@@ -65,13 +75,11 @@ onUnmounted(() => {
     <div class="page-head">
       <div>
         <h1 class="h1">传输</h1>
-        <p class="sub">正在上传的任务、等待对方接收的转发，以及最近的结果。</p>
+        <p class="sub">这里只显示正在进行和失败的任务；完成内容统一归档到“传输记录”。</p>
       </div>
     </div>
 
-    <p v-if="transfers.forwardsError" class="sub" style="margin-bottom: 14px; color: var(--alert)">
-      {{ transfers.forwardsError }}
-    </p>
+    <NoticeBanner :message="transfers.forwardsError" tone="error" @dismiss="transfers.forwardsError = ''" />
 
     <div class="readouts" style="margin-bottom: 20px">
       <div class="readout" :class="{ 'is-live': totalRate > 0 }">
@@ -178,27 +186,23 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <section v-if="transfers.doneJobs.length" class="card" style="margin-top: 14px">
+    <section v-if="transfers.failedJobs.length || transfers.failedForwards.length" class="card" style="margin-top: 14px">
       <div class="card-head">
-        <h3 class="h3">最近结束</h3>
+        <h3 class="h3">失败的传输</h3>
         <div class="spacer" />
         <RouterLink class="btn btn-sm" to="/history">全部记录</RouterLink>
       </div>
-      <div v-for="j in transfers.doneJobs.slice(0, 5)" :key="j.id" class="xfer">
+      <div v-for="j in transfers.failedJobs" :key="j.id" class="xfer">
         <div class="xfer-top">
           <div class="xfer-dir"><Icon name="upload" /></div>
           <div style="min-width: 0">
             <div class="xfer-title">{{ j.title }}</div>
             <div class="xfer-peer">
-              {{ j.kind === 'send' ? `发送至 ${j.targetName}` : '上传到服务器' }} ·
-              {{ formatWhen(j.updatedAt) }}
+              {{ j.kind === 'send' ? `发送至 ${j.targetName}` : '上传到服务器' }} · {{ formatWhen(j.updatedAt) }}
             </div>
           </div>
           <div class="xfer-figs">
-            <span
-              class="chip"
-              :class="j.phase === 'done' ? 'chip-ok' : j.phase === 'failed' ? 'chip-alert' : 'chip-idle'"
-            >
+            <span class="chip chip-alert">
               {{ phaseLabel[j.phase] }}
             </span>
           </div>
@@ -206,7 +210,18 @@ onUnmounted(() => {
             <Icon name="x" />
           </button>
         </div>
-        <p v-if="j.error" class="sub" style="margin: 6px 0 0; color: var(--alert)">{{ j.error }}</p>
+        <p class="sub" style="margin: 6px 0 0; color: var(--alert)">{{ failureInChinese(j.error) }}</p>
+      </div>
+      <div v-for="f in transfers.failedForwards" :key="f.forwardId" class="xfer">
+        <div class="xfer-top">
+          <div class="xfer-dir"><Icon name="transfer" /></div>
+          <div style="min-width:0">
+            <div class="xfer-title">{{ f.files.length === 1 ? f.files[0].path : `${f.files.length} 个文件` }}</div>
+            <div class="xfer-peer">发送至 {{ peerName(f) }} · {{ formatBytes(f.totalBytes) }}</div>
+          </div>
+          <div class="spacer" /><span class="chip chip-alert">失败</span>
+        </div>
+        <p class="sub" style="margin:6px 0 0;color:var(--alert)">{{ failureInChinese(f.failureReason) }}</p>
       </div>
     </section>
   </div>

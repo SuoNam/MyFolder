@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getOAuthProviders, resetPassword, sendEmailCode, startOAuth, toApiError, type OAuthProviderStatus } from '@/api'
 import { useUserStore } from '@/stores/user'
 
 type Mode = 'login' | 'signup' | 'forgot'
 const user = useUserStore()
 const router = useRouter()
+const route = useRoute()
 const mode = ref<Mode>('login')
 const account = ref(user.account)
 const email = ref('')
@@ -80,6 +81,7 @@ async function oauthLogin(provider: string) {
 }
 
 onMounted(async () => {
+  if (route.query.reason === 'session-expired') notice.value = '登录状态已失效，请重新登录'
   try { providers.value = await getOAuthProviders() } catch { providers.value = [] }
 })
 onUnmounted(() => window.clearInterval(timer))
