@@ -135,7 +135,7 @@
         </div>
       </section>
 
-      <section id="features" class="content-section section-wrap snap-page">
+      <section id="features" class="content-section section-wrap snap-page" :class="{ 'is-current-page': activePageIndex === 1 }">
         <div class="section-heading reveal">
           <span class="section-index">01 / PRODUCT</span>
           <div>
@@ -146,7 +146,15 @@
         </div>
 
         <div class="feature-grid">
-          <article v-for="(feature, index) in features" :key="feature.title" class="feature-card reveal" :class="`reveal-delay-${(index % 3) + 1}`">
+          <article
+            v-for="(feature, index) in features"
+            :key="feature.title"
+            class="feature-card reveal interactive-card"
+            :class="`reveal-delay-${(index % 3) + 1}`"
+            :style="{ '--card-index': index }"
+            @pointermove="tiltCard"
+            @pointerleave="resetCardTilt"
+          >
             <div class="feature-top">
               <span class="feature-icon"><AppIcon :name="feature.icon" /></span>
               <span class="feature-number">0{{ index + 1 }}</span>
@@ -160,7 +168,7 @@
         </div>
       </section>
 
-      <section id="how-it-works" class="route-section snap-page">
+      <section id="how-it-works" class="route-section snap-page" :class="{ 'is-current-page': activePageIndex === 2 }">
         <div class="section-wrap">
           <div class="section-heading section-heading-light reveal">
             <span class="section-index">02 / ROUTING</span>
@@ -175,7 +183,7 @@
             <div class="route-table-head">
               <span>通道</span><span>适用场景</span><span>数据路径</span><span>特点</span>
             </div>
-            <div v-for="(route, index) in routes" :key="route.name" class="route-table-row" :class="{ 'is-active': activeRouteIndex === index }">
+            <div v-for="(route, index) in routes" :key="route.name" class="route-table-row" :class="{ 'is-active': activeRouteIndex === index }" :style="{ '--row-index': index }">
               <span class="route-name"><i :class="route.className"></i>{{ route.name }}</span>
               <span>{{ route.scene }}</span>
               <span>{{ route.path }}</span>
@@ -201,7 +209,7 @@
         </div>
       </section>
 
-      <section id="security" class="content-section section-wrap security-section snap-page">
+      <section id="security" class="content-section section-wrap security-section snap-page" :class="{ 'is-current-page': activePageIndex === 3 }">
         <div class="security-visual reveal">
           <div class="security-grid-lines"></div>
           <div class="security-shield"><AppIcon name="shield" /></div>
@@ -231,7 +239,7 @@
         </div>
       </section>
 
-      <section id="download" class="download-section snap-page">
+      <section id="download" class="download-section snap-page" :class="{ 'is-current-page': activePageIndex === 4 }">
         <div class="section-wrap download-layout">
           <div class="download-copy reveal">
             <span class="section-index">04 / GET MYFOLDER</span>
@@ -241,7 +249,7 @@
           </div>
 
           <div class="download-cards">
-            <article class="download-card download-primary reveal reveal-delay-1">
+            <article class="download-card download-primary reveal reveal-delay-1 interactive-card" style="--card-index: 0" @pointermove="tiltCard" @pointerleave="resetCardTilt">
               <span class="download-platform"><AppIcon name="monitor" /> WINDOWS CLIENT</span>
               <h3>桌面客户端</h3>
               <p>Qt 6 桌面应用，支持右键菜单、Shell Extension、LAN / P2P / Relay 传输与桌面 OAuth 回调。</p>
@@ -249,7 +257,7 @@
               <a class="button button-dark" href="https://github.com/SuoNam/MyFolder/releases/tag/v1.1.1" target="_blank" rel="noreferrer">下载 Windows 版本 <AppIcon name="download" /></a>
             </article>
 
-            <article class="download-card download-linux reveal reveal-delay-2">
+            <article class="download-card download-linux reveal reveal-delay-2 interactive-card" style="--card-index: 1" @pointermove="tiltCard" @pointerleave="resetCardTilt">
               <span class="download-platform"><AppIcon name="monitor" /> LINUX CLIENT</span>
               <h3>Linux 客户端</h3>
               <p>原生 DEB 安装包，支持 Ubuntu / Debian、LAN / P2P / Relay 传输、SHA-256 校验与断点恢复。</p>
@@ -257,7 +265,7 @@
               <a class="button button-outline-dark" href="https://github.com/SuoNam/MyFolder/releases/tag/v1.1.1" target="_blank" rel="noreferrer">下载 Linux DEB <AppIcon name="download" /></a>
             </article>
 
-            <article class="download-card download-web reveal reveal-delay-3">
+            <article class="download-card download-web reveal reveal-delay-3 interactive-card" style="--card-index: 2" @pointermove="tiltCard" @pointerleave="resetCardTilt">
               <span class="download-platform"><AppIcon name="devices" /> WEB CONSOLE</span>
               <h3>无需安装</h3>
               <p>在浏览器中登录账号，管理设备、文件、群组、传输任务、历史记录与 OAuth 绑定。</p>
@@ -380,6 +388,26 @@ function trackPointer(event) {
 
 function resetPointer() {
   siteShell.value?.classList.remove('has-pointer')
+}
+
+function tiltCard(event) {
+  if (window.innerWidth <= 900 || event.pointerType === 'touch') return
+  const card = event.currentTarget
+  const rect = card.getBoundingClientRect()
+  const pointerX = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
+  const pointerY = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
+  card.style.setProperty('--tilt-x', `${(0.5 - pointerY) * 5}deg`)
+  card.style.setProperty('--tilt-y', `${(pointerX - 0.5) * 7}deg`)
+  card.style.setProperty('--glow-x', `${pointerX * 100}%`)
+  card.style.setProperty('--glow-y', `${pointerY * 100}%`)
+}
+
+function resetCardTilt(event) {
+  const card = event.currentTarget
+  card.style.removeProperty('--tilt-x')
+  card.style.removeProperty('--tilt-y')
+  card.style.removeProperty('--glow-x')
+  card.style.removeProperty('--glow-y')
 }
 
 function handleWheel(event) {

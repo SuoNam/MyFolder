@@ -71,3 +71,16 @@
   .download-web h3{margin-top:45px}
 }
 @media(max-width:900px){.page-rail{display:none}}
+
+/* Card choreography: chapters deal cards in, then pointer position controls depth and light. */
+.interactive-card{--tilt-x:0deg;--tilt-y:0deg;--glow-x:50%;--glow-y:50%;transform-style:preserve-3d;will-change:transform,translate,filter;transition:transform .32s cubic-bezier(.2,.78,.22,1),box-shadow .32s,border-color .32s!important}
+.interactive-card::before{position:absolute;z-index:0;inset:0;content:"";pointer-events:none;opacity:0;background:radial-gradient(circle at var(--glow-x) var(--glow-y),color-mix(in srgb,var(--green-bright) 20%,transparent),transparent 42%);transition:opacity .28s!important}
+.interactive-card>*{position:relative;z-index:1;transform:translateZ(0);transition:transform .32s cubic-bezier(.2,.78,.22,1)!important}
+.interactive-card:hover{transform:perspective(900px) translateY(-10px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));border-color:color-mix(in srgb,var(--green) 54%,var(--line));box-shadow:0 34px 78px color-mix(in srgb,var(--green-deep) 24%,transparent)}
+.interactive-card:hover::before{opacity:1}.interactive-card:hover .feature-icon,.interactive-card:hover .download-platform{transform:translateZ(24px)}.interactive-card:hover h3{transform:translateZ(18px)}
+.download-primary.interactive-card:hover{transform:perspective(900px) translateY(-30px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y))}.download-primary.interactive-card::before{background:radial-gradient(circle at var(--glow-x) var(--glow-y),rgba(86,216,149,.23),transparent 43%)}
+.snap-page.is-current-page .feature-card.is-visible,.snap-page.is-current-page .download-card.is-visible{animation:card-deal-in .68s calc(var(--card-index,0) * 90ms) cubic-bezier(.18,.78,.25,1) both;animation-duration:.68s!important}
+.route-section.is-current-page .route-table-row{animation:row-slide-in .52s calc(var(--row-index,0) * 75ms + 120ms) cubic-bezier(.18,.78,.25,1) both;animation-duration:.52s!important}
+.security-section.is-current-page .security-visual{animation:visual-unfold .72s cubic-bezier(.18,.78,.25,1) both;animation-duration:.72s!important}.security-section.is-current-page .security-copy{animation:copy-arrive .64s .12s cubic-bezier(.18,.78,.25,1) both;animation-duration:.64s!important}
+@keyframes card-deal-in{from{opacity:0;filter:blur(7px);translate:0 42px;scale:.95}to{opacity:1;filter:blur(0);translate:0 0;scale:1}}@keyframes row-slide-in{from{opacity:0;translate:48px 0}to{opacity:1;translate:0 0}}@keyframes visual-unfold{from{opacity:0;clip-path:inset(18% 18% 18% 18% round 28px);scale:.96}to{opacity:1;clip-path:inset(0 0 0 0 round 0);scale:1}}@keyframes copy-arrive{from{opacity:0;translate:34px 0}to{opacity:1;translate:0 0}}
+@media(max-width:900px){.interactive-card:hover,.download-primary.interactive-card:hover{transform:none}.interactive-card::before{display:none}}
