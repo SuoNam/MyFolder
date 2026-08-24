@@ -1,5 +1,6 @@
 ﻿<template>
   <div ref="siteShell" class="site-shell" @pointermove="trackPointer" @pointerleave="resetPointer">
+    <div v-if="themeCurtain" class="theme-curtain" :class="themeCurtainTone" aria-hidden="true"></div>
     <div class="scroll-progress" aria-hidden="true"><span :style="{ transform: `scaleX(${scrollProgress})` }"></span></div>
     <div class="ambient-pointer" aria-hidden="true"></div>
     <header class="site-header" :class="{ 'is-scrolled': isScrolled }">
@@ -21,7 +22,7 @@
       </nav>
 
       <div class="header-actions">
-        <button class="icon-button" type="button" :aria-label="darkMode ? '切换浅色模式' : '切换深色模式'" @click="toggleTheme">
+        <button class="icon-button" :class="{ 'is-theme-animating': themeAnimating }" type="button" :aria-label="darkMode ? '切换浅色模式' : '切换深色模式'" @click="toggleTheme">
           <AppIcon :name="darkMode ? 'sun' : 'moon'" />
         </button>
         <a class="text-link desktop-only" href="https://github.com/SuoNam/MyFolder" target="_blank" rel="noreferrer">
@@ -60,6 +61,7 @@
           </div>
           <div class="hero-meta" aria-label="产品能力摘要">
             <span><AppIcon name="check" /> Windows 桌面端</span>
+            <span><AppIcon name="check" /> Linux DEB 客户端</span>
             <span><AppIcon name="check" /> Web 管理</span>
             <span><AppIcon name="check" /> SHA-256 校验</span>
           </div>
@@ -222,7 +224,7 @@
             <span class="section-index">04 / GET MYFOLDER</span>
             <p class="kicker">MyFolder v1.1.1</p>
             <h2>让下一次文件传输，<br />少一步绕路。</h2>
-            <p>Windows 桌面端负责设备注册、文件发送与系统集成；Web 控制台用于跨设备管理、文件浏览和传输追踪。</p>
+            <p>Windows 与 Linux 桌面端负责设备注册、文件发送和端到端传输；Web 控制台用于跨设备管理、文件浏览与传输追踪。</p>
           </div>
 
           <div class="download-cards">
@@ -231,10 +233,18 @@
               <h3>桌面客户端</h3>
               <p>Qt 6 桌面应用，支持右键菜单、Shell Extension、LAN / P2P / Relay 传输与桌面 OAuth 回调。</p>
               <div class="download-card-meta"><span>v1.1.1</span><span>Windows 10 / 11</span></div>
-              <a class="button button-dark" href="https://github.com/SuoNam/MyFolder/releases" target="_blank" rel="noreferrer">前往 GitHub Releases <AppIcon name="download" /></a>
+              <a class="button button-dark" href="https://github.com/SuoNam/MyFolder/releases/tag/v1.1.1" target="_blank" rel="noreferrer">下载 Windows 版本 <AppIcon name="download" /></a>
             </article>
 
-            <article class="download-card reveal reveal-delay-2">
+            <article class="download-card download-linux reveal reveal-delay-2">
+              <span class="download-platform"><AppIcon name="monitor" /> LINUX CLIENT</span>
+              <h3>Linux 客户端</h3>
+              <p>原生 DEB 安装包，支持 Ubuntu / Debian、LAN / P2P / Relay 传输、SHA-256 校验与断点恢复。</p>
+              <div class="download-card-meta"><span>v1.1.1</span><span>Debian / Ubuntu · amd64</span></div>
+              <a class="button button-outline-dark" href="https://github.com/SuoNam/MyFolder/releases/tag/v1.1.1" target="_blank" rel="noreferrer">下载 Linux DEB <AppIcon name="download" /></a>
+            </article>
+
+            <article class="download-card download-web reveal reveal-delay-3">
               <span class="download-platform"><AppIcon name="devices" /> WEB CONSOLE</span>
               <h3>无需安装</h3>
               <p>在浏览器中登录账号，管理设备、文件、群组、传输任务、历史记录与 OAuth 绑定。</p>
@@ -284,6 +294,9 @@ import AppIcon from './components/AppIcon.vue'
 const menuOpen = ref(false)
 const isScrolled = ref(false)
 const darkMode = ref(false)
+const themeAnimating = ref(false)
+const themeCurtain = ref(false)
+const themeCurtainTone = ref('to-dark')
 const siteShell = ref(null)
 const scrollProgress = ref(0)
 const activeRouteIndex = ref(0)
@@ -346,10 +359,41 @@ function resetPointer() {
   siteShell.value?.classList.remove('has-pointer')
 }
 
-function toggleTheme() {
-  darkMode.value = !darkMode.value
-  document.documentElement.dataset.theme = darkMode.value ? 'dark' : 'light'
-  localStorage.setItem('myfolder-theme', darkMode.value ? 'dark' : 'light')
+function applyTheme(nextDark) {
+  darkMode.value = nextDark
+  document.documentElement.dataset.theme = nextDark ? 'dark' : 'light'
+  localStorage.setItem('myfolder-theme', nextDark ? 'dark' : 'light')
+}
+
+function toggleTheme(event) {
+  if (themeAnimating.value) return
+
+  const nextDark = !darkMode.value
+  const buttonRect = event.currentTarget?.getBoundingClientRect()
+  const originX = event.clientX || (buttonRect ? buttonRect.left + buttonRect.width / 2 : window.innerWidth - 60)
+  const originY = event.clientY || (buttonRect ? buttonRect.top + buttonRect.height / 2 : 42)
+  document.documentElement.style.setProperty('--theme-x', `${originX}px`)
+  document.documentElement.style.setProperty('--theme-y', `${originY}px`)
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    applyTheme(nextDark)
+    return
+  }
+
+  themeAnimating.value = true
+  if (document.startViewTransition) {
+    const transition = document.startViewTransition(() => applyTheme(nextDark))
+    transition.finished.finally(() => { themeAnimating.value = false })
+    return
+  }
+
+  themeCurtainTone.value = nextDark ? 'to-dark' : 'to-light'
+  themeCurtain.value = true
+  window.setTimeout(() => applyTheme(nextDark), 280)
+  window.setTimeout(() => {
+    themeCurtain.value = false
+    themeAnimating.value = false
+  }, 640)
 }
 
 let observer
