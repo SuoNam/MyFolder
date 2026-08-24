@@ -228,7 +228,14 @@
           <p>支持 Nyauth、Google 与 GitHub OAuth。v1.1.1 引入 state、PKCE、OIDC nonce、邮箱验证码二次认证，以及可撤销的 Access / Refresh Token 会话。</p>
           <div class="provider-row">
             <span class="provider provider-nyauth">N</span>
-            <span class="provider provider-google">G</span>
+            <span class="provider provider-google" title="Google">
+              <svg class="google-mark" viewBox="0 0 24 24" role="img" aria-label="Google">
+                <path fill="#4285f4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.87h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.89-1.74 2.98-4.31 2.98-7.35Z" />
+                <path fill="#34a853" d="M12 22c2.7 0 4.96-.9 6.62-2.42l-3.24-2.51c-.89.6-2.04.95-3.38.95-2.6 0-4.81-1.76-5.6-4.12H3.06v2.59A10 10 0 0 0 12 22Z" />
+                <path fill="#fbbc05" d="M6.4 13.9A6.01 6.01 0 0 1 6.09 12c0-.66.11-1.3.31-1.9V7.51H3.06A10 10 0 0 0 2 12c0 1.61.39 3.14 1.06 4.49L6.4 13.9Z" />
+                <path fill="#ea4335" d="M12 5.98c1.47 0 2.79.5 3.83 1.49l2.86-2.87C16.96 2.99 14.7 2 12 2a10 10 0 0 0-8.94 5.51l3.34 2.59C7.19 7.74 9.4 5.98 12 5.98Z" />
+              </svg>
+            </span>
             <span class="provider provider-github"><AppIcon name="github" /></span>
             <span class="provider-label">登录 · 绑定 · 解绑</span>
           </div>
