@@ -117,6 +117,17 @@ public class UserController {
         return ok("用户名已更新", accounts.updateDisplayName(account, request.displayName()));
     }
 
+    @PatchMapping("/me/transfer-preferences")
+    @Operation(summary = "修改设备间传输接收偏好")
+    public BaseMessage<AuthDtos.AccountProfile> updateTransferPreferences(
+            @RequestBody AuthDtos.TransferPreferencesRequest request,
+            @RequestHeader("Authorization") String token) {
+        String account = jwt.subject(token);
+        if (account == null) throw new AuthException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "登录状态已失效");
+        return ok("传输偏好已更新", accounts.updateTransferPreferences(
+                account, request.autoAcceptDeviceTransfers()));
+    }
+
     @PostMapping("/sensitive/verify")
     @Operation(summary = "校验邮箱验证码并签发 10 分钟敏感操作凭据")
     public BaseMessage<AuthDtos.SensitiveTicket> verifySensitive(

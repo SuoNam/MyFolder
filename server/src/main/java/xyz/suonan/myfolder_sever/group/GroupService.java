@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import xyz.suonan.myfolder_sever.auth.AuthException;
 import xyz.suonan.myfolder_sever.auth.AuthRepository;
+import xyz.suonan.myfolder_sever.auth.VerificationService;
 
 import java.util.List;
 import java.util.Locale;
@@ -51,10 +52,12 @@ public class GroupService {
         groups.delete(id);
     }
 
-    public GroupDtos.Group addMember(String account, String id, String memberAccount, String rawPermission) {
+    public GroupDtos.Group addMember(String account, String id, String memberEmail, String rawPermission) {
         requireOwner(id, account);
-        String target = requireAccount(memberAccount);
-        if (!users.accountExists(target)) throw error(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "用户不存在");
+        String email = VerificationService.normalizeEmail(memberEmail);
+        String target = users.userByEmail(email)
+                .map(AuthRepository.UserRow::account)
+                .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "该邮箱没有对应的 MyFolder 用户"));
         if (requireGroup(id).owner().equals(target)) throw error(HttpStatus.CONFLICT, "OWNER_ALREADY_MEMBER", "群组所有者已经是成员");
         try {
             groups.addMember(id, target, memberPermission(rawPermission));
@@ -75,6 +78,17 @@ public class GroupService {
         requireOwner(id, account);
         if (requireGroup(id).owner().equals(memberAccount)) throw error(HttpStatus.BAD_REQUEST, "OWNER_IMMUTABLE", "不能移除群组所有者");
         groups.removeMember(id, memberAccount);
+    }
+
+    @Transactional
+    public void leave(String account, String id) {
+        account = requireAccount(account);
+        String permission = requirePermission(id, account, false);
+        if ("OWNER".equals(permission)) {
+            throw error(HttpStatus.CONFLICT, "OWNER_CANNOT_LEAVE", "群主不能直接退出群组，请先转让群主或删除群组");
+        }
+        groups.removeMemberAcl(id, account);
+        groups.removeMember(id, account);
     }
 
     public String requirePermission(String id, String account, boolean write) {

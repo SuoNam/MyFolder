@@ -98,8 +98,12 @@ public class ResumableTransferService {
         try {
             store.save(task);
             createEmptyFiles(task);
+            materializeReusableFiles(task);
+            touch(task);
+            store.save(task);
             return task;
         } catch (RuntimeException exception) {
+            rollbackCreate(task);
             if (quota != null) quota.release(task.uploadId);
             throw exception;
         }
@@ -107,6 +111,11 @@ public class ResumableTransferService {
 
     public UploadTask status(String ownerUserId, String uploadId) {
         return loadOwned(ownerUserId, uploadId);
+    }
+
+    public List<UploadTask> list(String ownerUserId) {
+        requireUser(ownerUserId);
+        return store.findAllByOwner(ownerUserId);
     }
 
     public UploadTask uploadChunk(String ownerUserId, String uploadId, String filePath, int chunkIndex,
@@ -408,9 +417,11 @@ public class ResumableTransferService {
     private Path finalPath(UploadTask task, UploadFile file) {
         Path scopeRoot = scopes == null ? storageRoot
                 : scopes.resolve(task.ownerUserId, task.scopeType, task.scopeId, null, true).root();
+        String targetFilePath = task.targetPath == null || task.targetPath.isBlank()
+                ? file.path : task.targetPath + "/" + file.path;
         if (scopes != null) scopes.authorizePath(
                 new StorageScopeService.Scope(task.scopeType, task.scopeId, scopeRoot),
-                task.ownerUserId, (task.targetPath == null ? "" : task.targetPath) + "/" + file.path, true);
+                task.ownerUserId, targetFilePath, true);
         return resolveInside(scopeRoot, task.targetPath, file.path);
     }
 
@@ -466,6 +477,89 @@ public class ResumableTransferService {
         }
     }
 
+    /**
+     * Zero-network server-side reuse.  A candidate is accepted only when it is
+     * inside the same storage scope, readable by the uploader, has the same
+     * size, and its content hashes to the manifest SHA-256.  We copy instead
+     * of hard-linking so a later write to either logical file cannot mutate the
+     * other user's/group entry.
+     */
+    private void materializeReusableFiles(UploadTask task) {
+        // Legacy/embedded mode has no ownership-aware scope resolver, so reuse
+        // is deliberately disabled there to prevent cross-user hash probing.
+        if (scopes == null) return;
+        StorageScopeService.Scope scope = scopes.resolve(
+                task.ownerUserId, task.scopeType, task.scopeId, null, true);
+        for (UploadFile file : task.files.values()) {
+            if (file.size == 0 || file.state == UploadState.COMPLETED) continue;
+            Path target = finalPath(task, file);
+            if (Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                try {
+                    if (Files.isRegularFile(target, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                            && Files.size(target) == file.size
+                            && TransferHash.sha256(target).equalsIgnoreCase(file.sha256)) {
+                        file.state = UploadState.COMPLETED;
+                        file.materializedByTask = false;
+                        continue;
+                    }
+                } catch (IOException exception) {
+                    throw storage("Unable to verify existing target content", exception);
+                }
+                throw new TransferException(TransferErrorCode.TARGET_ALREADY_EXISTS, CONFLICT,
+                        "Target file already exists with different content", Map.of("filePath", file.path));
+            }
+            Path candidate = findReusableCandidate(scope, task.ownerUserId, target, file);
+            if (candidate == null) continue;
+            try {
+                Files.createDirectories(target.getParent());
+                Path temporary = target.resolveSibling(target.getFileName() + ".myfolder-copy-" + task.uploadId);
+                Files.copy(candidate, temporary, StandardCopyOption.REPLACE_EXISTING);
+                if (Files.size(temporary) != file.size
+                        || !TransferHash.sha256(temporary).equalsIgnoreCase(file.sha256)) {
+                    Files.deleteIfExists(temporary);
+                    continue;
+                }
+                moveAtomically(temporary, target);
+                file.materializedByTask = true;
+                file.state = UploadState.COMPLETED;
+                file.failureReason = null;
+                if (quota != null && "GROUP".equals(task.scopeType)) {
+                    String objectPath = task.targetPath == null || task.targetPath.isBlank()
+                            ? file.path : task.targetPath + "/" + file.path;
+                    quota.recordGroupFile(task.scopeId, objectPath, task.ownerUserId, file.size);
+                }
+                if (quota != null) quota.consume(task.uploadId, file.size);
+            } catch (IOException exception) {
+                throw storage("Unable to reuse verified server content", exception);
+            }
+        }
+        if (allFilesComplete(task)) task.state = UploadState.VERIFYING;
+    }
+
+    private Path findReusableCandidate(StorageScopeService.Scope scope, String account,
+                                       Path target, UploadFile wanted) {
+        if (!Files.isDirectory(scope.root(), java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
+        try (var paths = Files.walk(scope.root())) {
+            return paths.filter(path -> !path.equals(target))
+                    .filter(path -> Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                    .filter(path -> {
+                        try {
+                            if (Files.size(path) != wanted.size) return false;
+                            if (scopes != null) {
+                                String relative = scope.root().relativize(path).toString().replace('\\', '/');
+                                try { scopes.authorizePath(scope, account, relative, false); }
+                                catch (RuntimeException denied) { return false; }
+                            }
+                            return TransferHash.sha256(path).equalsIgnoreCase(wanted.sha256);
+                        } catch (IOException ignored) {
+                            return false;
+                        }
+                    }).findFirst().orElse(null);
+        } catch (IOException ignored) {
+            return null;
+        }
+    }
+
     private void resetCorruptFile(UploadTask task, UploadFile file, String reason) throws IOException {
         Files.deleteIfExists(stagingPath(task, file));
         file.completedChunks.clear();
@@ -513,6 +607,25 @@ public class ResumableTransferService {
         }
         touch(task);
         store.save(task);
+    }
+
+    private void rollbackCreate(UploadTask task) {
+        for (UploadFile file : task.files.values()) {
+            if (!file.materializedByTask) continue;
+            try {
+                Path target = finalPath(task, file);
+                if (Files.isRegularFile(target, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                        && Files.size(target) == file.size
+                        && TransferHash.sha256(target).equalsIgnoreCase(file.sha256)) {
+                    Files.deleteIfExists(target);
+                }
+            } catch (RuntimeException | IOException ignored) {
+                // Preserve the original create error; an operator can remove a
+                // verified orphan if the filesystem refused rollback.
+            }
+        }
+        deleteStagingDirectory(task);
+        try { store.delete(task.uploadId); } catch (RuntimeException ignored) { }
     }
 
     private List<Integer> missingChunks(UploadFile file) {

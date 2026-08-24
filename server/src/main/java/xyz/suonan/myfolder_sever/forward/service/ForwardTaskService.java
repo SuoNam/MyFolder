@@ -10,6 +10,7 @@ import xyz.suonan.myfolder_sever.MyObject.Device.Device;
 import xyz.suonan.myfolder_sever.Utils.SafeRelativePath;
 import xyz.suonan.myfolder_sever.device.service.DeviceService;
 import xyz.suonan.myfolder_sever.forward.api.CreateForwardTaskRequest;
+import xyz.suonan.myfolder_sever.forward.api.ForwardSignalRequest;
 import xyz.suonan.myfolder_sever.forward.model.*;
 import xyz.suonan.myfolder_sever.transfer.error.TransferException;
 import xyz.suonan.myfolder_sever.transfer.model.UploadFile;
@@ -21,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -36,6 +38,7 @@ public class ForwardTaskService {
     private final Map<String, ForwardTask> tasks = new ConcurrentHashMap<>();
     private final Map<String, Object> taskLocks = new ConcurrentHashMap<>();
     private final Path metadataFile;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public ForwardTaskService(DeviceService deviceService, ResumableTransferService transferService,
                               ObjectMapper objectMapper,
@@ -62,8 +65,9 @@ public class ForwardTaskService {
         Device caller = authenticate(userId, callerDeviceId, deviceToken);
         if (request == null || blank(request.sourceDeviceId()) || blank(request.targetDeviceId())
                 || request.sourceDeviceId().equals(request.targetDeviceId())
-                || request.files() == null || request.files().isEmpty()) {
-            throw invalid("Source device, target device and files are required");
+                || ((request.files() == null || request.files().isEmpty())
+                    && (request.directories() == null || request.directories().isEmpty()))) {
+            throw invalid("Source device, target device and a file or directory manifest are required");
         }
         if (!caller.getDeviceId().equals(request.sourceDeviceId())) throw notFound();
         Device source = deviceService.find(userId, request.sourceDeviceId());
@@ -73,6 +77,7 @@ public class ForwardTaskService {
         }
         String destinationPath = safePath(request.destinationPath(), "destinationPath");
         List<ForwardFile> files = validateFiles(request.files());
+        List<String> directories = validateDirectories(request.directories(), files);
         ForwardChannel channel = resolveChannel(request.channel(), source, target);
         validateRelay(userId, channel, request.relayUploadId(), files);
 
@@ -84,8 +89,12 @@ public class ForwardTaskService {
         task.setDestinationPath(destinationPath);
         task.setDeleteSource(request.deleteSource());
         task.setChannel(channel);
+        if (channel == ForwardChannel.LAN || channel == ForwardChannel.P2P) {
+            task.setDirectTransferToken(newDirectTransferToken());
+        }
         task.setRelayUploadId(request.relayUploadId());
         task.setFiles(files);
+        task.setDirectories(directories);
         task.setTotalBytes(sumBytes(files));
         task.setState(ForwardState.OFFERED);
         task.setCreatedAt(Instant.now());
@@ -109,6 +118,19 @@ public class ForwardTaskService {
                 .toList();
     }
 
+    /**
+     * Account-wide transfer ledger.  Authentication still belongs to a real
+     * registered device, but the result is deliberately not restricted to
+     * transfers in which that particular device participated.
+     */
+    public List<ForwardTask> history(String userId, String callerDeviceId, String deviceToken) {
+        authenticate(userId, callerDeviceId, deviceToken);
+        return tasks.values().stream()
+                .filter(task -> userId.equals(task.getUserId()))
+                .sorted(Comparator.comparing(ForwardTask::getCreatedAt).reversed())
+                .toList();
+    }
+
     public ForwardTask get(String userId, String callerDeviceId, String deviceToken, String forwardId) {
         Device caller = authenticate(userId, callerDeviceId, deviceToken);
         ForwardTask task = owned(userId, forwardId);
@@ -125,6 +147,15 @@ public class ForwardTaskService {
         });
     }
 
+    public ForwardTask reject(String userId, String deviceId, String deviceToken, String forwardId) {
+        return mutateAsTarget(userId, deviceId, deviceToken, forwardId, task -> {
+            require(task, ForwardState.OFFERED);
+            task.setState(ForwardState.REJECTED);
+            task.setFailureReason("Target device rejected the transfer");
+            notifyAfterSave(task, "task.forward.rejected", task.getSourceDeviceId());
+        });
+    }
+
     public ForwardTask start(String userId, String deviceId, String deviceToken, String forwardId) {
         return mutateAsTarget(userId, deviceId, deviceToken, forwardId, task -> {
             if (task.getState() != ForwardState.ACCEPTED && task.getState() != ForwardState.TRANSFERRING
@@ -133,6 +164,7 @@ public class ForwardTaskService {
             }
             task.setState(ForwardState.TRANSFERRING);
             task.setFailureReason(null);
+            notifyAfterSave(task, "task.forward.started", task.getSourceDeviceId());
         });
     }
 
@@ -160,13 +192,24 @@ public class ForwardTaskService {
 
     public ForwardTask fail(String userId, String deviceId, String deviceToken,
                             String forwardId, String reason) {
-        return mutateAsTarget(userId, deviceId, deviceToken, forwardId, task -> {
+        Device caller = authenticate(userId, deviceId, deviceToken);
+        Object lock = taskLocks.computeIfAbsent(forwardId, ignored -> new Object());
+        synchronized (lock) {
+            ForwardTask task = owned(userId, forwardId);
+            requireParticipant(task, caller.getDeviceId());
+            requireNotTerminal(task);
             if (task.getState() != ForwardState.ACCEPTED && task.getState() != ForwardState.TRANSFERRING) {
                 throw conflict("Forward task cannot fail in its current state");
             }
             task.setState(ForwardState.FAILED);
             task.setFailureReason(blank(reason) ? "Client reported transfer failure" : reason);
-        });
+            touch(task);
+            save();
+            String otherDevice = caller.getDeviceId().equals(task.getSourceDeviceId())
+                    ? task.getTargetDeviceId() : task.getSourceDeviceId();
+            notify(deviceService.find(userId, otherDevice), "task.forward.failed", task);
+            return task;
+        }
     }
 
     public ForwardTask cancel(String userId, String deviceId, String deviceToken, String forwardId) {
@@ -184,6 +227,30 @@ public class ForwardTaskService {
             notify(deviceService.find(userId, otherDevice), "task.forward.cancelled", task);
             return task;
         }
+    }
+
+    public void signal(String userId, String deviceId, String deviceToken,
+                       String forwardId, ForwardSignalRequest signal) {
+        Device caller = authenticate(userId, deviceId, deviceToken);
+        ForwardTask task = owned(userId, forwardId);
+        requireParticipant(task, caller.getDeviceId());
+        requireNotTerminal(task);
+        if (task.getChannel() != ForwardChannel.P2P
+                || (task.getState() != ForwardState.ACCEPTED && task.getState() != ForwardState.TRANSFERRING))
+            throw conflict("P2P signaling is not available for this task state");
+        if (signal == null || !("description".equals(signal.kind()) || "candidate".equals(signal.kind())))
+            throw invalid("Signal kind must be description or candidate");
+        if ("description".equals(signal.kind())
+                && (blank(signal.sdp()) || signal.sdp().length() > 262_144
+                    || !("offer".equals(signal.type()) || "answer".equals(signal.type()))))
+            throw invalid("Invalid P2P session description");
+        if ("candidate".equals(signal.kind())
+                && (blank(signal.candidate()) || signal.candidate().length() > 16_384
+                    || signal.mid() != null && signal.mid().length() > 256))
+            throw invalid("Invalid P2P ICE candidate");
+        String targetId = caller.getDeviceId().equals(task.getSourceDeviceId())
+                ? task.getTargetDeviceId() : task.getSourceDeviceId();
+        notifySignal(deviceService.find(userId, targetId), task, caller.getDeviceId(), signal);
     }
 
     public RelayContent relayContent(String userId, String deviceId, String deviceToken,
@@ -282,15 +349,18 @@ public class ForwardTaskService {
     }
 
     private void requireNotTerminal(ForwardTask task) {
-        if (task.getState() == ForwardState.COMPLETED || task.getState() == ForwardState.CANCELLED) {
+        if (task.getState() == ForwardState.COMPLETED || task.getState() == ForwardState.CANCELLED
+                || task.getState() == ForwardState.REJECTED) {
             throw conflict("Forward task is terminal");
         }
     }
 
     private List<ForwardFile> validateFiles(List<ForwardFile> requestedFiles) {
+        if (requestedFiles != null && requestedFiles.size() > 10_000)
+            throw invalid("A forward task cannot contain more than 10000 files");
         Set<String> paths = new HashSet<>();
         List<ForwardFile> result = new ArrayList<>();
-        for (ForwardFile file : requestedFiles) {
+        for (ForwardFile file : requestedFiles == null ? List.<ForwardFile>of() : requestedFiles) {
             if (file == null || file.size() < 0 || blank(file.sha256())
                     || !file.sha256().matches("[0-9a-fA-F]{64}")) {
                 throw invalid("Each file needs a safe path, non-negative size and SHA-256");
@@ -300,6 +370,21 @@ public class ForwardTaskService {
             result.add(new ForwardFile(path, file.size(), file.sha256().toLowerCase(Locale.ROOT)));
         }
         sumBytes(result);
+        return List.copyOf(result);
+    }
+
+    private List<String> validateDirectories(List<String> requestedDirectories, List<ForwardFile> files) {
+        if (requestedDirectories != null && requestedDirectories.size() > 10_000)
+            throw invalid("A forward task cannot contain more than 10000 directories");
+        Set<String> paths = new HashSet<>();
+        List<String> result = new ArrayList<>();
+        for (String value : requestedDirectories == null ? List.<String>of() : requestedDirectories) {
+            String path = safePath(value, "directory path");
+            if (!paths.add(path)) throw invalid("Directory paths must be unique");
+            result.add(path);
+        }
+        if (files.isEmpty() && result.isEmpty())
+            throw invalid("A forward task must contain at least one file or directory");
         return List.copyOf(result);
     }
 
@@ -322,9 +407,20 @@ public class ForwardTaskService {
     }
 
     private ForwardChannel resolveChannel(ForwardChannel requested, Device source, Device target) {
-        if (requested != null && requested != ForwardChannel.AUTO) return requested;
+        if (requested != null && requested != ForwardChannel.AUTO) {
+            if (requested == ForwardChannel.LAN && (blank(target.getDeviceAddress())
+                    || target.getListenPort() == null || !target.isOnline())) {
+                throw new ForwardException("DIRECT_ENDPOINT_UNAVAILABLE",
+                        "Target device has no active LAN endpoint");
+            }
+            if (requested == ForwardChannel.P2P && !target.isOnline()) {
+                throw new ForwardException("DIRECT_ENDPOINT_UNAVAILABLE",
+                        "Target device is offline and cannot negotiate P2P");
+            }
+            return requested;
+        }
         if (source.getListenPort() != null && target.getListenPort() != null
-                && sameSubnet(source.getDeviceAddress(), target.getDeviceAddress())) return ForwardChannel.LAN;
+                && sameSubnet(source.getLocalAddresses(), target.getLocalAddresses())) return ForwardChannel.LAN;
         return ForwardChannel.RELAY;
     }
 
@@ -380,11 +476,35 @@ public class ForwardTaskService {
         }
     }
 
-    private boolean sameSubnet(String left, String right) {
-        if (blank(left) || blank(right)) return false;
-        String[] a = left.split("\\.");
-        String[] b = right.split("\\.");
-        return a.length == 4 && b.length == 4 && a[0].equals(b[0]) && a[1].equals(b[1]) && a[2].equals(b[2]);
+    private boolean sameSubnet(List<String> left, List<String> right) {
+        if (left == null || right == null) return false;
+        for (String local : left) {
+            String[] localParts = local.split("/", 2);
+            if (localParts.length != 2) continue;
+            try {
+                int prefix = Integer.parseInt(localParts[1]);
+                long mask = prefix == 0 ? 0 : 0xffffffffL << (32 - prefix);
+                long network = ipv4(localParts[0]) & mask;
+                for (String candidate : right) {
+                    String address = candidate.split("/", 2)[0];
+                    if ((ipv4(address) & mask) == network) return true;
+                }
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return false;
+    }
+
+    private long ipv4(String value) {
+        String[] parts = value.split("\\.");
+        if (parts.length != 4) throw new IllegalArgumentException();
+        long result = 0;
+        for (String part : parts) {
+            int octet = Integer.parseInt(part);
+            if (octet < 0 || octet > 255) throw new IllegalArgumentException();
+            result = (result << 8) | octet;
+        }
+        return result;
     }
 
     private void notify(Device device, String action, ForwardTask task) {
@@ -400,6 +520,29 @@ public class ForwardTaskService {
                 if (device.getWebSocketSession().isOpen()) {
                     device.getWebSocketSession().sendMessage(new TextMessage(serialized));
                 }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void notifySignal(Device device, ForwardTask task, String fromDeviceId,
+                              ForwardSignalRequest signal) {
+        if (device == null || device.getWebSocketSession() == null || !device.getWebSocketSession().isOpen()) return;
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("forwardId", task.getForwardId());
+            payload.put("sourceDeviceId", task.getSourceDeviceId());
+            payload.put("targetDeviceId", task.getTargetDeviceId());
+            payload.put("fromDeviceId", fromDeviceId);
+            payload.put("signal", signal);
+            Map<String, Object> message = new LinkedHashMap<>();
+            message.put("action", "task.forward.signal");
+            message.put("timestamp", Instant.now().toString());
+            message.put("msgId", UUID.randomUUID().toString());
+            message.put("payload", payload);
+            synchronized (device.getWebSocketSession()) {
+                if (device.getWebSocketSession().isOpen())
+                    device.getWebSocketSession().sendMessage(new TextMessage(objectMapper.writeValueAsString(message)));
             }
         } catch (Exception ignored) {
         }
@@ -426,6 +569,12 @@ public class ForwardTaskService {
 
     private boolean blank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String newDirectTransferToken() {
+        byte[] value = new byte[32];
+        secureRandom.nextBytes(value);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
     }
 
     private ForwardException invalid(String message) {

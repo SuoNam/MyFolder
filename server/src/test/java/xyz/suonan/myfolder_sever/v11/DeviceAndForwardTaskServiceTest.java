@@ -5,9 +5,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
 import xyz.suonan.myfolder_sever.device.api.DeviceRegistrationRequest;
 import xyz.suonan.myfolder_sever.device.service.DeviceService;
 import xyz.suonan.myfolder_sever.forward.api.CreateForwardTaskRequest;
+import xyz.suonan.myfolder_sever.forward.api.ForwardSignalRequest;
 import xyz.suonan.myfolder_sever.forward.model.*;
 import xyz.suonan.myfolder_sever.forward.service.ForwardTaskService;
 import xyz.suonan.myfolder_sever.transfer.api.CreateUploadTaskRequest;
@@ -23,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class DeviceAndForwardTaskServiceTest {
     private static final String USER = "alice";
@@ -133,6 +138,96 @@ class DeviceAndForwardTaskServiceTest {
     }
 
     @Test
+    void issuesCapabilityForDirectLanTransfer() {
+        CreateForwardTaskRequest request = new CreateForwardTaskRequest(SOURCE, TARGET, "Downloads",
+                false, ForwardChannel.LAN, null, manifest());
+
+        ForwardTask task = forwards.create(USER, SOURCE, sourceToken, request);
+
+        assertNotNull(task.getDirectTransferToken());
+        assertTrue(task.getDirectTransferToken().length() >= 32);
+        assertNull(task.getRelayUploadId());
+    }
+
+    @Test
+    void autoSelectsLanUsingAnyAdvertisedInterfaceSubnet() {
+        devices.register(USER, new DeviceRegistrationRequest(SOURCE, SOURCE, "PC", "Windows", "1.1.1",
+                "10.0.0.10", 49152, List.of("10.0.0.10/24", "192.168.50.10/24")));
+        devices.register(USER, new DeviceRegistrationRequest(TARGET, TARGET, "PC", "Windows", "1.1.1",
+                "172.16.0.11", 49153, List.of("192.168.50.11/24")));
+        CreateForwardTaskRequest request = new CreateForwardTaskRequest(SOURCE, TARGET, "Downloads",
+                false, ForwardChannel.AUTO, null, manifest());
+
+        ForwardTask task = forwards.create(USER, SOURCE, sourceToken, request);
+
+        assertEquals(ForwardChannel.LAN, task.getChannel());
+        assertEquals(List.of("10.0.0.10/24", "192.168.50.10/24"),
+                devices.get(USER, SOURCE).getLocalAddresses());
+    }
+
+    @Test
+    void preservesFolderManifestIncludingEmptyDirectories() {
+        CreateForwardTaskRequest request = new CreateForwardTaskRequest(SOURCE, TARGET, "Downloads",
+                false, ForwardChannel.LAN, null, manifest(),
+                List.of("Album", "Album/nested", "Album/nested/empty"));
+
+        ForwardTask task = forwards.create(USER, SOURCE, sourceToken, request);
+
+        assertEquals(List.of("Album", "Album/nested", "Album/nested/empty"), task.getDirectories());
+        CreateForwardTaskRequest invalid = new CreateForwardTaskRequest(SOURCE, TARGET, "Downloads",
+                false, ForwardChannel.LAN, null, manifest(), List.of("Album/../escape"));
+        assertCode("INVALID_PATH", () -> forwards.create(USER, SOURCE, sourceToken, invalid));
+    }
+
+    @Test
+    void acceptsFolderManifestContainingOnlyEmptyDirectories() {
+        CreateForwardTaskRequest request = new CreateForwardTaskRequest(SOURCE, TARGET, "Downloads",
+                false, ForwardChannel.LAN, null, List.of(),
+                List.of("EmptyAlbum", "EmptyAlbum/nested"));
+
+        ForwardTask task = forwards.create(USER, SOURCE, sourceToken, request);
+
+        assertTrue(task.getFiles().isEmpty());
+        assertEquals(List.of("EmptyAlbum", "EmptyAlbum/nested"), task.getDirectories());
+        assertEquals(0, task.getTotalBytes());
+    }
+
+    @Test
+    void rejectsP2pTaskWhenTargetIsOffline() {
+        devices.unregister(USER, TARGET);
+        CreateForwardTaskRequest request = new CreateForwardTaskRequest(SOURCE, TARGET, "Downloads",
+                false, ForwardChannel.P2P, null, manifest());
+
+        assertCode("DIRECT_ENDPOINT_UNAVAILABLE",
+                () -> forwards.create(USER, SOURCE, sourceToken, request));
+    }
+
+    @Test
+    void relaysValidatedP2pSignalsOnlyToTheOtherParticipant() throws Exception {
+        WebSocketSession targetSession = mock(WebSocketSession.class);
+        when(targetSession.isOpen()).thenReturn(true);
+        devices.find(USER, TARGET).setWebSocketSession(targetSession);
+        CreateForwardTaskRequest request = new CreateForwardTaskRequest(SOURCE, TARGET, "Downloads",
+                false, ForwardChannel.P2P, null, manifest());
+        ForwardTask task = forwards.create(USER, SOURCE, sourceToken, request);
+        clearInvocations(targetSession);
+        forwards.accept(USER, TARGET, targetToken, task.getForwardId());
+
+        forwards.signal(USER, SOURCE, sourceToken, task.getForwardId(),
+                new ForwardSignalRequest("description", "offer", "v=0\r\n", null, null));
+
+        ArgumentCaptor<TextMessage> message = ArgumentCaptor.forClass(TextMessage.class);
+        verify(targetSession).sendMessage(message.capture());
+        String payload = message.getValue().getPayload();
+        assertTrue(payload.contains("task.forward.signal"));
+        assertTrue(payload.contains("\"kind\":\"description\""));
+        assertCode("INVALID_REQUEST", () -> forwards.signal(USER, SOURCE, sourceToken,
+                task.getForwardId(), new ForwardSignalRequest("candidate", null, null, "", null)));
+        assertHidden(() -> forwards.signal(USER, OTHER, otherToken, task.getForwardId(),
+                new ForwardSignalRequest("description", "offer", "v=0", null, null)));
+    }
+
+    @Test
     void rejectsWebDeviceAsForwardTarget() {
         devices.register(USER, new DeviceRegistrationRequest("browser", "Web Console", "WEB", "Win32",
                 "1.1.1-web", "10.0.0.20", null));
@@ -187,6 +282,30 @@ class DeviceAndForwardTaskServiceTest {
     }
 
     @Test
+    void targetCanRejectAnOfferedTransfer() {
+        ForwardTask task = createRelay(completedUpload(USER, "relay-rejected").uploadId);
+        assertEquals(ForwardState.REJECTED,
+                forwards.reject(USER, TARGET, targetToken, task.getForwardId()).getState());
+        assertCode("TASK_STATE_CONFLICT",
+                () -> forwards.accept(USER, TARGET, targetToken, task.getForwardId()));
+    }
+
+    @Test
+    void sourceCanReportDirectChannelFallbackReason() {
+        ForwardTask task = forwards.create(USER, SOURCE, sourceToken,
+                new CreateForwardTaskRequest(SOURCE, TARGET, "Downloads", false,
+                        ForwardChannel.LAN, null, manifest()));
+        forwards.accept(USER, TARGET, targetToken, task.getForwardId());
+        forwards.start(USER, TARGET, targetToken, task.getForwardId());
+
+        ForwardTask failed = forwards.fail(USER, SOURCE, sourceToken, task.getForwardId(),
+                "LAN_FALLBACK: ProxyProtocolError");
+
+        assertEquals(ForwardState.FAILED, failed.getState());
+        assertEquals("LAN_FALLBACK: ProxyProtocolError", failed.getFailureReason());
+    }
+
+    @Test
     void restoresForwardHistoryAfterRestart() {
         ForwardTask task = createRelay(completedUpload(USER, "relay-restart").uploadId);
         ForwardTaskService restarted = new ForwardTaskService(devices, transfers, mapper,
@@ -196,6 +315,8 @@ class DeviceAndForwardTaskServiceTest {
         assertEquals(task.getForwardId(), restarted.get(USER, TARGET, targetToken, task.getForwardId()).getForwardId());
         assertEquals(1, restarted.list(USER, SOURCE, sourceToken).size());
         assertTrue(restarted.list(USER, OTHER, otherToken).isEmpty());
+        assertEquals(task.getForwardId(),
+                restarted.history(USER, OTHER, otherToken).get(0).getForwardId());
     }
 
     private String register(String user, String id, String address, int port) {

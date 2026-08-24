@@ -62,7 +62,8 @@ v1.1.1 对账号体系进行了完整升级，包含：
 
 | 分支 | 内容 |
 |---|---|
-| [`main`](https://github.com/SuoNam/MyFolder/tree/main) | MyFolder Server 源码和 Web v1.1.1 部署产物 |
+| [`main`](https://github.com/SuoNam/MyFolder/tree/main) | MyFolder Server 源码、官网源码和 Web v1.1.1 部署产物 |
+| [`web`](https://github.com/SuoNam/MyFolder/tree/web) | Vue 3 Web 控制台源码 |
 | [`client`](https://github.com/SuoNam/MyFolder/tree/client) | Qt 6 / QML 桌面客户端源码与 Windows 打包配置 |
 | [`dev`](https://github.com/SuoNam/MyFolder/tree/dev) | 历史开发内容；不保证与当前发布版同步 |
 
@@ -79,6 +80,10 @@ v1.1.1 对账号体系进行了完整升级，包含：
 ├── web/                    # Vue Web 控制台的生产构建产物
 │   ├── assets/
 │   └── index.html
+├── official-site/          # MyFolder 官网 Vue/Vite 源码
+│   ├── public/
+│   ├── src/
+│   └── package.json
 └── docs/
     └── RELEASE_NOTES_v1.1.1.md
 ```

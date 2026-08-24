@@ -9,9 +9,11 @@ import xyz.suonan.myfolder_sever.Utils.JwtGen;
 import xyz.suonan.myfolder_sever.auth.*;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -42,6 +44,28 @@ class UserControllerTest {
                         .content("{\"clientType\":\"WEB\",\"link\":false}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("OAUTH_PROVIDER_INVALID"));
+    }
+
+    @Test
+    void transferPreferencesAreStoredForAuthenticatedAccount() throws Exception {
+        AccountService accounts = mock(AccountService.class);
+        JwtGen jwt = mock(JwtGen.class);
+        when(jwt.subject("Bearer token")).thenReturn("alice");
+        AuthDtos.AccountProfile profile = new AuthDtos.AccountProfile(
+                "alice", "Alice", "alice@example.com", true, true, java.util.List.of());
+        when(accounts.updateTransferPreferences("alice", true)).thenReturn(profile);
+        UserController controller = new UserController(accounts, mock(SessionService.class),
+                mock(VerificationService.class), mock(AuthRepository.class), jwt, mock(OAuthService.class));
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new AuthExceptionHandler()).build();
+
+        mvc.perform(patch("/user/me/transfer-preferences")
+                        .header("Authorization", "Bearer token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"autoAcceptDeviceTransfers\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.autoAcceptDeviceTransfers").value(true));
+        verify(accounts).updateTransferPreferences("alice", true);
     }
 
     private MockMvc mvc(AccountService accounts) {

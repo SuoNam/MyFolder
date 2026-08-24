@@ -8,7 +8,7 @@ public final class GroupDtos {
 
     public record CreateGroupRequest(String name) {}
     public record RenameGroupRequest(String name) {}
-    public record AddMemberRequest(String account, String permission) {}
+    public record AddMemberRequest(String email, String permission) {}
     public record UpdateMemberRequest(String permission) {}
     public record Member(String account, String displayName, String permission, Instant joinedAt) {}
     public record Group(String groupId, String name, String ownerAccount, String myPermission,

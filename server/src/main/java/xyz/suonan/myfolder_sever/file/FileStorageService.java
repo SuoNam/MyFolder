@@ -108,6 +108,62 @@ public class FileStorageService {
         copy(paths.root(), sourcePath, targetPath);
     }
 
+    public void moveAcrossScopes(Path sourceRoot, String sourcePath, Path targetRoot, String targetPath) {
+        Path source = paths.resolveExisting(sourceRoot, sourcePath);
+        Path target = paths.resolve(targetRoot, targetPath);
+        if (Files.exists(target)) {
+            throw new FileOperationException(HttpStatus.CONFLICT, "TARGET_EXISTS", "目标位置已存在同名文件或文件夹",
+                    null, Map.of("sourcePath", sourcePath, "targetPath", targetPath));
+        }
+        Path parent = target.getParent();
+        if (parent == null || !Files.isDirectory(parent)) {
+            throw badRequest("TARGET_DIRECTORY_NOT_FOUND", "目标文件夹不存在", targetPath);
+        }
+        boolean sourceFile = Files.isRegularFile(source);
+        List<Path> oldFiles = sourceFile ? List.of(source) : regularFiles(source);
+        try {
+            Files.move(source, target);
+            for (Path oldFile : oldFiles) {
+                Path relative = sourceFile ? Path.of("") : source.relativize(oldFile);
+                updateMetadata(oldFile, sourceFile ? target : target.resolve(relative));
+            }
+        } catch (IOException exception) {
+            throw io("移动文件", sourcePath, exception);
+        }
+    }
+
+    public void copyAcrossScopes(Path sourceRoot, String sourcePath, Path targetRoot, String targetPath) {
+        Path source = paths.resolveExisting(sourceRoot, sourcePath);
+        Path target = paths.resolve(targetRoot, targetPath);
+        if (Files.exists(target)) {
+            throw new FileOperationException(HttpStatus.CONFLICT, "TARGET_EXISTS", "目标位置已存在同名文件或文件夹",
+                    null, Map.of("sourcePath", sourcePath, "targetPath", targetPath));
+        }
+        Path parent = target.getParent();
+        if (parent == null || !Files.isDirectory(parent)) {
+            throw badRequest("TARGET_DIRECTORY_NOT_FOUND", "目标文件夹不存在", targetPath);
+        }
+        try {
+            if (Files.isRegularFile(source)) {
+                Files.copy(source, target);
+                recordMetadata(target);
+                return;
+            }
+            List<Path> entries;
+            try (Stream<Path> walk = Files.walk(source)) { entries = walk.toList(); }
+            for (Path entry : entries) {
+                Path destination = target.resolve(source.relativize(entry));
+                if (Files.isDirectory(entry)) Files.createDirectories(destination);
+                else {
+                    Files.copy(entry, destination);
+                    recordMetadata(destination);
+                }
+            }
+        } catch (IOException exception) {
+            throw io("复制文件", sourcePath, exception);
+        }
+    }
+
     public void copy(Path scopeRoot, String sourcePath, String targetPath) {
         Path source = paths.resolveExisting(scopeRoot, sourcePath);
         Path target = paths.resolve(scopeRoot, targetPath);

@@ -15,6 +15,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.List;
 
 @RestController
 @Tag(name = "Resumable uploads", description = "Chunked uploads with resumable status, per-chunk SHA-256 and whole-file SHA-256 verification.")
@@ -39,6 +40,11 @@ public class ResumableTransferController {
                                                            HttpServletRequest servletRequest) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(UploadTaskResponse.from(service.create(userId(servletRequest), request.toCurrent())));
+    }
+
+    @GetMapping({"/file/uploadfile", "/api/v1/transfers/tasks"})
+    public List<UploadTaskResponse> list(HttpServletRequest request) {
+        return service.list(userId(request)).stream().map(UploadTaskResponse::from).toList();
     }
 
     @GetMapping({"/file/uploadfile/{uploadId}", "/api/v1/transfers/tasks/{uploadId}"})

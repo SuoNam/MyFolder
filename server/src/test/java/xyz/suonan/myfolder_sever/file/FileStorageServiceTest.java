@@ -122,4 +122,52 @@ class FileStorageServiceTest {
 
         assertEquals("content", Files.readString(root.resolve("copy/child/file.txt")));
     }
+
+    @Test
+    void movesFileAcrossStorageScopesWithoutOverwriting() throws Exception {
+        Path privateRoot = Files.createDirectories(root.resolve("users/alice"));
+        Path groupRoot = Files.createDirectories(root.resolve("groups/team/docs"));
+        Path source = Files.writeString(privateRoot.resolve("report.txt"), "content");
+
+        service.moveAcrossScopes(privateRoot, "report.txt", root.resolve("groups/team"), "docs/report.txt");
+
+        assertFalse(Files.exists(source));
+        assertEquals("content", Files.readString(groupRoot.resolve("report.txt")));
+        verify(metadata).updateFileInfoByPath(source.toAbsolutePath().toString(),
+                groupRoot.resolve("report.txt").toAbsolutePath().toString());
+
+        Files.writeString(privateRoot.resolve("report.txt"), "new");
+        FileOperationException exception = assertThrows(FileOperationException.class,
+                () -> service.moveAcrossScopes(privateRoot, "report.txt", root.resolve("groups/team"), "docs/report.txt"));
+        assertEquals("TARGET_EXISTS", exception.getCode());
+        assertEquals("new", Files.readString(privateRoot.resolve("report.txt")));
+    }
+
+    @Test
+    void copiesDirectoryAcrossStorageScopesWithoutRemovingSource() throws Exception {
+        Path privateRoot = Files.createDirectories(root.resolve("users/alice/source/sub"));
+        Path source = Files.writeString(privateRoot.resolve("report.txt"), "content");
+        Path groupRoot = Files.createDirectories(root.resolve("groups/team/docs"));
+
+        service.copyAcrossScopes(root.resolve("users/alice"), "source", root.resolve("groups/team"), "docs/source");
+
+        assertEquals("content", Files.readString(groupRoot.resolve("source/sub/report.txt")));
+        assertEquals("content", Files.readString(source));
+        verify(metadata).insertFileInfo(any());
+    }
+
+    @Test
+    void copyAcrossStorageScopesDoesNotOverwrite() throws Exception {
+        Path privateRoot = Files.createDirectories(root.resolve("users/alice"));
+        Path groupRoot = Files.createDirectories(root.resolve("groups/team/docs"));
+        Files.writeString(privateRoot.resolve("report.txt"), "source");
+        Files.writeString(groupRoot.resolve("report.txt"), "target");
+
+        FileOperationException exception = assertThrows(FileOperationException.class,
+                () -> service.copyAcrossScopes(privateRoot, "report.txt", root.resolve("groups/team"), "docs/report.txt"));
+
+        assertEquals("TARGET_EXISTS", exception.getCode());
+        assertEquals("source", Files.readString(privateRoot.resolve("report.txt")));
+        assertEquals("target", Files.readString(groupRoot.resolve("report.txt")));
+    }
 }

@@ -115,6 +115,35 @@ class ForwardTaskControllerTest {
                 .andExpect(content().bytes("ell".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
 
+    @Test
+    void rejectPassesTargetDeviceCredentials() throws Exception {
+        ForwardTask task = task();
+        task.setState(ForwardState.REJECTED);
+        when(service.reject(USER, "target", "token", "forward-1")).thenReturn(task);
+
+        mockMvc.perform(post("/api/v1/forwards/forward-1/reject")
+                        .requestAttr("myfolder.userId", USER)
+                        .header("X-Device-Id", "target")
+                        .header("X-Device-Token", "token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("REJECTED"));
+        verify(service).reject(USER, "target", "token", "forward-1");
+    }
+
+    @Test
+    void historyReturnsAccountWideLedgerUsingDeviceCredentials() throws Exception {
+        when(service.history(USER, "source", "token")).thenReturn(List.of(task()));
+
+        mockMvc.perform(get("/api/v1/forwards/history")
+                        .requestAttr("myfolder.userId", USER)
+                        .header("X-Device-Id", "source")
+                        .header("X-Device-Token", "token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].forwardId").value("forward-1"));
+
+        verify(service).history(USER, "source", "token");
+    }
+
     private String validJson() {
         return "{\"sourceDeviceId\":\"source\",\"targetDeviceId\":\"target\"," +
                 "\"destinationPath\":\"Downloads\",\"deleteSource\":false,\"channel\":\"LAN\"," +

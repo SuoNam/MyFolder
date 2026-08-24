@@ -71,7 +71,8 @@ public class AccountService {
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "账号不存在"));
         List<AuthDtos.OAuthBinding> bindings = repository.identitiesFor(account).stream()
                 .map(i -> new AuthDtos.OAuthBinding(i.provider(), i.username(), i.email(), i.createdAt())).toList();
-        return new AuthDtos.AccountProfile(user.account(), user.displayName(), user.email(), user.emailVerifiedAt() != null, bindings);
+        return new AuthDtos.AccountProfile(user.account(), user.displayName(), user.email(),
+                user.emailVerifiedAt() != null, user.autoAcceptDeviceTransfers(), bindings);
     }
 
     @Transactional
@@ -84,6 +85,16 @@ public class AccountService {
             throw new AuthException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "账号不存在");
         }
         repository.updateDisplayName(account, displayName);
+        return profile(account);
+    }
+
+    @Transactional
+    public AuthDtos.AccountProfile updateTransferPreferences(String account,
+                                                              boolean autoAcceptDeviceTransfers) {
+        if (repository.userByAccount(account).isEmpty()) {
+            throw new AuthException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "账号不存在");
+        }
+        repository.updateTransferPreferences(account, autoAcceptDeviceTransfers);
         return profile(account);
     }
 

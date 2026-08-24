@@ -123,6 +123,19 @@ class ResumableTransferControllerTest {
     }
 
     @Test
+    void listRouteReturnsCurrentUsersUploadHistory() throws Exception {
+        when(service.list(USER)).thenReturn(List.of(task));
+
+        mockMvc.perform(get(BASE).requestAttr("myfolder.userId", USER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].uploadId").value(UPLOAD_ID))
+                .andExpect(jsonPath("$[0].targetPath").value("inbox/demo"))
+                .andExpect(jsonPath("$[0].createdAt").value(1786071600.0));
+
+        verify(service).list(USER);
+    }
+
+    @Test
     void chunkRouteDecodesPathAndParsesContentRange() throws Exception {
         byte[] content = "hello".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         when(service.uploadChunk(USER, UPLOAD_ID, "docs/a b.txt", 0, 0, 4, 5, HASH, content)).thenReturn(task);

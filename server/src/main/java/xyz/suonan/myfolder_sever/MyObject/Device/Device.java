@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.web.socket.WebSocketSession;
 import java.time.Instant;
+import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
@@ -24,6 +25,7 @@ public class Device {
     private Instant createdAt;
     private Instant lastSeenAt;
     private boolean online;
+    private List<String> localAddresses;
     @JsonIgnore
     private transient WebSocketSession webSocketSession;
 }

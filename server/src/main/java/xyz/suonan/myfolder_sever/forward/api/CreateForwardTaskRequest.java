@@ -12,5 +12,14 @@ public record CreateForwardTaskRequest(
         boolean deleteSource,
         ForwardChannel channel,
         String relayUploadId,
-        List<ForwardFile> files) {
+        List<ForwardFile> files,
+        List<String> directories) {
+
+    public CreateForwardTaskRequest(String sourceDeviceId, String targetDeviceId,
+                                    String destinationPath, boolean deleteSource,
+                                    ForwardChannel channel, String relayUploadId,
+                                    List<ForwardFile> files) {
+        this(sourceDeviceId, targetDeviceId, destinationPath, deleteSource, channel,
+                relayUploadId, files, List.of());
+    }
 }

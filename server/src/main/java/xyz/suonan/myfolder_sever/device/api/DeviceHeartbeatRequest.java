@@ -1,4 +1,10 @@
 package xyz.suonan.myfolder_sever.device.api;
 
-public record DeviceHeartbeatRequest(String deviceAddress, Integer listenPort, String clientVersion) {
+import java.util.List;
+
+public record DeviceHeartbeatRequest(String deviceAddress, Integer listenPort, String clientVersion,
+                                     List<String> localAddresses) {
+    public DeviceHeartbeatRequest(String deviceAddress, Integer listenPort, String clientVersion) {
+        this(deviceAddress, listenPort, clientVersion, List.of());
+    }
 }

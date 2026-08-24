@@ -59,6 +59,9 @@ public class GroupRepository {
     public void removeMember(String id, String account) {
         jdbc.update("DELETE FROM storage_group_member WHERE group_id=? AND user_account=? AND permission<>'OWNER'", id, account);
     }
+    public void removeMemberAcl(String id, String account) {
+        jdbc.update("DELETE FROM storage_group_folder_acl WHERE group_id=? AND user_account=?", id, account);
+    }
 
     public Optional<String> folderPermission(String id, String account, String pathHash) {
         return jdbc.query("SELECT permission FROM storage_group_folder_acl WHERE group_id=? AND user_account=? AND path_hash=?",

@@ -20,6 +20,7 @@ import xyz.suonan.myfolder_sever.file.StorageScopeService;
 import xyz.suonan.myfolder_sever.file.StorageQuotaService;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -127,6 +128,59 @@ public class FileHttpController {
         return new BaseMessage<>(200, "复制完毕", results);
     }
 
+    @PostMapping("/move-to-group")
+    @SecurityRequirement(name = OpenApiConfig.JWT_SCHEME)
+    @Operation(summary = "将私人文件移动到群组", description = "调用者必须拥有源文件写权限以及目标群组目录写权限")
+    public BaseMessage<List<BaseMessage<String>>> moveToGroup(@RequestBody MoveToGroupRequest request,
+                                                               HttpServletRequest servletRequest) {
+        return transferToGroup(request, servletRequest, false);
+    }
+
+    @PostMapping("/copy-to-group")
+    @SecurityRequirement(name = OpenApiConfig.JWT_SCHEME)
+    @Operation(summary = "将私人文件复制到群组", description = "调用者必须拥有源文件读权限以及目标群组目录写权限")
+    public BaseMessage<List<BaseMessage<String>>> copyToGroup(@RequestBody MoveToGroupRequest request,
+                                                               HttpServletRequest servletRequest) {
+        return transferToGroup(request, servletRequest, true);
+    }
+
+    private BaseMessage<List<BaseMessage<String>>> transferToGroup(MoveToGroupRequest request,
+                                                                    HttpServletRequest servletRequest,
+                                                                    boolean copy) {
+        String account = identity.required(servletRequest);
+        var sourceScope = scopes.resolve(account, "PRIVATE", "", null, true);
+        var targetScope = scopes.resolve(account, "GROUP", request.groupId(), null, true);
+        String targetDirectory = request.targetDirectory() == null ? "" : request.targetDirectory();
+        scopes.authorizePath(targetScope, account, targetDirectory, true);
+        if (request.sourcePaths() == null || request.sourcePaths().isEmpty()) {
+            throw new xyz.suonan.myfolder_sever.file.FileOperationException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "SOURCE_REQUIRED", "请至少选择一个文件或文件夹");
+        }
+        List<BaseMessage<String>> results = new ArrayList<>();
+        for (String sourcePath : request.sourcePaths()) {
+            scopes.authorizePath(sourceScope, account, sourcePath, !copy);
+            String normalizedSource = xyz.suonan.myfolder_sever.Utils.SafeRelativePath.normalize(sourcePath);
+            if (normalizedSource.isBlank()) {
+                throw new xyz.suonan.myfolder_sever.file.FileOperationException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST, "SOURCE_REQUIRED", "不能移动私人文件根目录");
+            }
+            String name = Path.of(normalizedSource).getFileName().toString();
+            String targetPath = targetDirectory == null || targetDirectory.isBlank()
+                    ? name
+                    : xyz.suonan.myfolder_sever.Utils.SafeRelativePath.normalize(targetDirectory) + "/" + name;
+            scopes.authorizePath(targetScope, account, targetPath, true);
+            if (copy) {
+                quota.requireAvailable(account, storage.totalSize(sourceScope.root(), normalizedSource));
+                storage.copyAcrossScopes(sourceScope.root(), normalizedSource, targetScope.root(), targetPath);
+            } else {
+                storage.moveAcrossScopes(sourceScope.root(), normalizedSource, targetScope.root(), targetPath);
+            }
+            quota.recordGroupTree(targetScope.id(), targetScope.root(), targetPath, account);
+            results.add(new BaseMessage<>(200, copy ? "已复制到群组" : "已移动到群组", sourcePath));
+        }
+        return new BaseMessage<>(200, copy ? "复制完毕" : "移动完毕", results);
+    }
+
     private StorageScopeService.Scope readScope(HttpServletRequest request, String owner) {
         return scopes.resolve(identity.optional(request), request.getHeader("X-Storage-Scope"),
                 request.getHeader("X-Storage-Scope-Id"), owner, false);
@@ -143,4 +197,5 @@ public class FileHttpController {
     public record MoveRequest(@Schema(example = "inbox/old.txt") String targetPath,
                               @Schema(example = "inbox/new.txt") String newPath) {}
     public record DeleteRequest(@Schema(example = "inbox/old.txt") String deletePath) {}
+    public record MoveToGroupRequest(String groupId, String targetDirectory, List<String> sourcePaths) {}
 }

@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import xyz.suonan.myfolder_sever.file.StorageQuotaService;
+import xyz.suonan.myfolder_sever.file.StorageScopeService;
 import xyz.suonan.myfolder_sever.transfer.api.CreateUploadTaskRequest;
 import xyz.suonan.myfolder_sever.transfer.api.UploadTaskResponse;
 import xyz.suonan.myfolder_sever.transfer.error.TransferErrorCode;
@@ -24,6 +26,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class ResumableTransferServiceTest {
     private static final String USER = "alice";
@@ -62,6 +66,32 @@ class ResumableTransferServiceTest {
         assertEquals(UploadState.UPLOADING, restored.state);
         assertEquals(USER, restored.ownerUserId);
         assertFalse(objectMapper.valueToTree(UploadTaskResponse.from(restored)).has("ownerUserId"));
+    }
+
+    @Test
+    void createsGroupUploadDirectlyAtGroupRoot() throws Exception {
+        JsonUploadTaskStore store = new JsonUploadTaskStore(objectMapper, metadataRoot.toString());
+        StorageScopeService scopes = mock(StorageScopeService.class);
+        StorageQuotaService quota = mock(StorageQuotaService.class);
+        Path groupRoot = temporaryDirectory.resolve("group-root");
+        StorageScopeService.Scope scope = new StorageScopeService.Scope("GROUP", "group-1", groupRoot);
+        when(scopes.resolve(eq(USER), eq("GROUP"), eq("group-1"), isNull(), eq(true)))
+                .thenReturn(scope);
+        ResumableTransferService scopedService = new ResumableTransferService(
+                store, storageRoot.toString(), scopes, quota);
+        String emptyHash = TransferHash.sha256(new byte[0]);
+        CreateUploadTaskRequest request = new CreateUploadTaskRequest(
+                "GROUP", "group-1", "", CHUNK_SIZE, 1, 0,
+                List.of(new CreateUploadTaskRequest.FileManifest("root.txt", 0, emptyHash, 0)));
+
+        UploadTask task = scopedService.create(USER, request);
+
+        assertEquals("GROUP", task.scopeType);
+        assertEquals("group-1", task.scopeId);
+        assertEquals("", task.targetPath);
+        assertTrue(Files.isRegularFile(groupRoot.resolve("root.txt")));
+        verify(scopes).authorizePath(scope, USER, "", true);
+        verify(scopes).authorizePath(scope, USER, "root.txt", true);
     }
 
     @Test
@@ -117,6 +147,30 @@ class ResumableTransferServiceTest {
     }
 
     @Test
+    void reusesVerifiedContentWithoutUploadingAnyChunk() throws Exception {
+        byte[] content = content(70_000);
+        Path privateRoot = temporaryDirectory.resolve("private-alice");
+        Files.createDirectories(privateRoot.resolve("existing"));
+        Files.write(privateRoot.resolve("existing/source.bin"), content);
+        JsonUploadTaskStore store = new JsonUploadTaskStore(objectMapper, metadataRoot.toString());
+        StorageScopeService scopes = mock(StorageScopeService.class);
+        StorageQuotaService quota = mock(StorageQuotaService.class);
+        StorageScopeService.Scope scope = new StorageScopeService.Scope("PRIVATE", USER, privateRoot);
+        when(scopes.resolve(eq(USER), eq("PRIVATE"), isNull(), isNull(), eq(true))).thenReturn(scope);
+        ResumableTransferService scopedService = new ResumableTransferService(
+                store, storageRoot.toString(), scopes, quota);
+
+        UploadTask task = scopedService.create(USER, request(content));
+        UploadTaskResponse.FileStatus status = UploadTaskResponse.from(task).files().get(0);
+
+        assertEquals(UploadState.COMPLETED, status.state());
+        assertTrue(status.missingChunks().isEmpty());
+        assertArrayEquals(content, Files.readAllBytes(
+                privateRoot.resolve("inbox/MyFolder Upload/docs/data.bin")));
+        assertEquals(UploadState.COMPLETED, scopedService.completeTask(USER, task.uploadId).state);
+    }
+
+    @Test
     void writesDirectlyToRootAndSingleSegmentTargets() throws Exception {
         byte[] content = content(1_024);
         for (String targetPath : List.of("", "documents")) {
@@ -126,9 +180,11 @@ class ResumableTransferServiceTest {
                     content.length, TransferHash.sha256(content), 1)));
             UploadTask task = service.create(USER, direct);
 
-            service.uploadChunk(USER, task.uploadId, filePath, 0, 0, content.length - 1L,
-                    content.length, TransferHash.sha256(content), content);
-            service.completeFile(USER, task.uploadId, filePath);
+            if (task.files.get(filePath).state != UploadState.COMPLETED) {
+                service.uploadChunk(USER, task.uploadId, filePath, 0, 0, content.length - 1L,
+                        content.length, TransferHash.sha256(content), content);
+                service.completeFile(USER, task.uploadId, filePath);
+            }
             service.completeTask(USER, task.uploadId);
 
             Path expected = targetPath.isEmpty()

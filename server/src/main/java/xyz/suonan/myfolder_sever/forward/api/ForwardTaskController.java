@@ -39,6 +39,13 @@ public class ForwardTaskController {
         return service.list(userId(request), deviceId, deviceToken);
     }
 
+    @GetMapping("/history")
+    public List<ForwardTask> history(@RequestHeader("X-Device-Id") String deviceId,
+                                     @RequestHeader("X-Device-Token") String deviceToken,
+                                     HttpServletRequest request) {
+        return service.history(userId(request), deviceId, deviceToken);
+    }
+
     @GetMapping("/{forwardId}")
     public ForwardTask get(@PathVariable String forwardId,
                            @RequestHeader("X-Device-Id") String deviceId,
@@ -53,6 +60,14 @@ public class ForwardTaskController {
                               @RequestHeader("X-Device-Token") String deviceToken,
                               HttpServletRequest request) {
         return service.accept(userId(request), deviceId, deviceToken, forwardId);
+    }
+
+    @PostMapping("/{forwardId}/reject")
+    public ForwardTask reject(@PathVariable String forwardId,
+                              @RequestHeader("X-Device-Id") String deviceId,
+                              @RequestHeader("X-Device-Token") String deviceToken,
+                              HttpServletRequest request) {
+        return service.reject(userId(request), deviceId, deviceToken, forwardId);
     }
 
     @PostMapping("/{forwardId}/start")
@@ -89,6 +104,16 @@ public class ForwardTaskController {
                             HttpServletRequest request) {
         return service.fail(userId(request), deviceId, deviceToken, forwardId,
                 body == null ? null : body.reason());
+    }
+
+    @PostMapping("/{forwardId}/signal")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void signal(@PathVariable String forwardId,
+                       @RequestBody ForwardSignalRequest body,
+                       @RequestHeader("X-Device-Id") String deviceId,
+                       @RequestHeader("X-Device-Token") String deviceToken,
+                       HttpServletRequest request) {
+        service.signal(userId(request), deviceId, deviceToken, forwardId, body);
     }
 
     @DeleteMapping("/{forwardId}")

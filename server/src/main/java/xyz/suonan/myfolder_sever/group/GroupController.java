@@ -22,7 +22,8 @@ public class GroupController {
     @GetMapping("/{id}") public BaseMessage<GroupDtos.Group> get(@PathVariable String id, HttpServletRequest r) { return ok(service.get(user(r), id)); }
     @PatchMapping("/{id}") public BaseMessage<GroupDtos.Group> rename(@PathVariable String id, @RequestBody GroupDtos.RenameGroupRequest b, HttpServletRequest r) { return ok(service.rename(user(r), id, b.name())); }
     @DeleteMapping("/{id}") public BaseMessage<Object> delete(@PathVariable String id, HttpServletRequest r) { service.delete(user(r), id); return ok(null); }
-    @PostMapping("/{id}/members") public BaseMessage<GroupDtos.Group> add(@PathVariable String id, @RequestBody GroupDtos.AddMemberRequest b, HttpServletRequest r) { return ok(service.addMember(user(r), id, b.account(), b.permission())); }
+    @PostMapping("/{id}/members") public BaseMessage<GroupDtos.Group> add(@PathVariable String id, @RequestBody GroupDtos.AddMemberRequest b, HttpServletRequest r) { return ok(service.addMember(user(r), id, b.email(), b.permission())); }
+    @PostMapping("/{id}/leave") public BaseMessage<Object> leave(@PathVariable String id, HttpServletRequest r) { service.leave(user(r), id); return ok(null); }
     @PatchMapping("/{id}/members/{account}") public BaseMessage<GroupDtos.Group> update(@PathVariable String id, @PathVariable String account, @RequestBody GroupDtos.UpdateMemberRequest b, HttpServletRequest r) { return ok(service.updateMember(user(r), id, account, b.permission())); }
     @DeleteMapping("/{id}/members/{account}") public BaseMessage<Object> remove(@PathVariable String id, @PathVariable String account, HttpServletRequest r) { service.removeMember(user(r), id, account); return ok(null); }
     @GetMapping("/{id}/acl") public BaseMessage<List<GroupDtos.FolderAcl>> acl(@PathVariable String id, @RequestParam(defaultValue = "") String folderPath, HttpServletRequest r) { return ok(service.folderAcl(user(r), id, folderPath)); }

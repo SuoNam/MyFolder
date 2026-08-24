@@ -16,7 +16,8 @@ public class AuthRepository {
 
     public AuthRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
-    public record UserRow(String account, String displayName, String password, String email, Instant emailVerifiedAt) {}
+    public record UserRow(String account, String displayName, String password, String email,
+                          Instant emailVerifiedAt, boolean autoAcceptDeviceTransfers) {}
     public record SessionRow(String id, String account, String clientType, Instant expiresAt, boolean revoked) {}
     public record VerificationRow(String id, String email, String purpose, String hash,
                                   Instant createdAt, Instant expiresAt, int attempts) {}
@@ -28,15 +29,15 @@ public class AuthRepository {
 
     private static final RowMapper<UserRow> USER = (rs, n) -> new UserRow(
             rs.getString("account"), rs.getString("display_name"), rs.getString("password"), rs.getString("email"),
-            instant(rs.getTimestamp("email_verified_at")));
+            instant(rs.getTimestamp("email_verified_at")), rs.getBoolean("auto_accept_device_transfers"));
 
     public Optional<UserRow> userByAccount(String account) {
-        return jdbc.query("SELECT account,display_name,password,email,email_verified_at FROM user WHERE account=?", USER, account)
+        return jdbc.query("SELECT account,display_name,password,email,email_verified_at,auto_accept_device_transfers FROM user WHERE account=?", USER, account)
                 .stream().findFirst();
     }
 
     public Optional<UserRow> userByEmail(String email) {
-        return jdbc.query("SELECT account,display_name,password,email,email_verified_at FROM user WHERE email=?", USER, email)
+        return jdbc.query("SELECT account,display_name,password,email,email_verified_at,auto_accept_device_transfers FROM user WHERE email=?", USER, email)
                 .stream().findFirst();
     }
 
@@ -72,6 +73,11 @@ public class AuthRepository {
 
     public void updateDisplayName(String account, String displayName) {
         jdbc.update("UPDATE user SET display_name=? WHERE account=?", displayName, account);
+    }
+
+    public void updateTransferPreferences(String account, boolean autoAcceptDeviceTransfers) {
+        jdbc.update("UPDATE user SET auto_accept_device_transfers=? WHERE account=?",
+                autoAcceptDeviceTransfers, account);
     }
 
     public void insertSession(String id, String account, String clientType, String refreshHash,

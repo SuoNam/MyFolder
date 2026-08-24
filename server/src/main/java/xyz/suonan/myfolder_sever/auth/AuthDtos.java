@@ -20,8 +20,9 @@ public final class AuthDtos {
     public record SessionResponse(String token, String accessToken, String refreshToken,
                                   long expiresIn, Instant refreshExpiresAt, String account, String email) {}
     public record AccountProfile(String account, String displayName, String email, boolean emailVerified,
-                                 List<OAuthBinding> oauthBindings) {}
+                                 boolean autoAcceptDeviceTransfers, List<OAuthBinding> oauthBindings) {}
     public record DisplayNameRequest(String displayName) {}
+    public record TransferPreferencesRequest(boolean autoAcceptDeviceTransfers) {}
     public record OAuthBinding(String provider, String username, String email, Instant boundAt) {}
     public record OAuthStartRequest(ClientType clientType, String returnUri, boolean link) {}
     public record OAuthStartResponse(String authorizationUrl, Instant expiresAt) {}

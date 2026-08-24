@@ -67,13 +67,14 @@ public class DeviceService {
             if (old == null) {
                 return new Device(deviceId, userId, request.deviceName().trim(), request.deviceType().trim(),
                         request.os().trim(), request.deviceAddress(), validPort(request.listenPort()), request.clientVersion().trim(),
-                        newToken(), now, now, true, null);
+                        newToken(), now, now, true, validAddresses(request.localAddresses()), null);
             }
             old.setDeviceName(request.deviceName().trim());
             old.setDeviceType(request.deviceType().trim());
             old.setOs(request.os().trim());
             old.setDeviceAddress(request.deviceAddress());
             old.setListenPort(validPort(request.listenPort()));
+            old.setLocalAddresses(validAddresses(request.localAddresses()));
             old.setClientVersion(request.clientVersion().trim());
             if (blank(old.getDeviceToken())) old.setDeviceToken(newToken());
             old.setLastSeenAt(now);
@@ -104,6 +105,8 @@ public class DeviceService {
         device.setLastSeenAt(now);
         if (request != null && !blank(request.deviceAddress())) device.setDeviceAddress(request.deviceAddress());
         if (request != null && request.listenPort() != null) device.setListenPort(validPort(request.listenPort()));
+        if (request != null && request.localAddresses() != null)
+            device.setLocalAddresses(validAddresses(request.localAddresses()));
         if (request != null && !blank(request.clientVersion())) device.setClientVersion(request.clientVersion());
         save();
         return toInfo(device);
@@ -179,6 +182,7 @@ public class DeviceService {
         info.setCreatedAt(device.getCreatedAt());
         info.setLastSeenAt(device.getLastSeenAt());
         info.setOnline(device.isOnline());
+        info.setLocalAddresses(device.getLocalAddresses() == null ? List.of() : device.getLocalAddresses());
         return info;
     }
 
@@ -189,6 +193,12 @@ public class DeviceService {
             throw new DeviceException("INVALID_REQUEST", "listenPort must be between 1 and 65535");
         }
         return port;
+    }
+    private List<String> validAddresses(List<String> addresses) {
+        if (addresses == null) return List.of();
+        return addresses.stream().filter(value -> value != null && value.matches(
+                        "(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)){3}/(?:[0-9]|[12][0-9]|3[0-2])"))
+                .distinct().limit(16).toList();
     }
     private String newToken() {
         byte[] value = new byte[32];

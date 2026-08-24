@@ -24,6 +24,7 @@ class FilterConfigTest {
         assertTrue(registration.getUrlPatterns().contains("/file/move"));
         assertTrue(registration.getUrlPatterns().contains("/file/delete"));
         assertTrue(registration.getUrlPatterns().contains("/file/copy"));
+        assertTrue(registration.getUrlPatterns().contains("/file/copy-to-group"));
         assertFalse(registration.getUrlPatterns().contains("/file/getfilelist"));
         assertFalse(registration.getUrlPatterns().contains("/file/downloadfile"));
     }

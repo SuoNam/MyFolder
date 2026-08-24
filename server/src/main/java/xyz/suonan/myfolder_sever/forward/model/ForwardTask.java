@@ -16,8 +16,11 @@ public class ForwardTask {
     private String destinationPath;
     private boolean deleteSource;
     private ForwardChannel channel;
+    /** High-entropy capability shared only with the two direct-transfer participants. */
+    private String directTransferToken;
     private String relayUploadId;
     private List<ForwardFile> files;
+    private List<String> directories;
     private long totalBytes;
     private long transferredBytes;
     private ForwardState state;

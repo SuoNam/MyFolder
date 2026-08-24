@@ -3,6 +3,7 @@ package xyz.suonan.myfolder_sever.MyObject.Device;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.Instant;
+import java.util.List;
 
 @Getter
 @Setter
@@ -18,4 +19,5 @@ public class DeviceInfo {
     private Instant createdAt;
     private Instant lastSeenAt;
     private boolean online;
+    private List<String> localAddresses;
 }

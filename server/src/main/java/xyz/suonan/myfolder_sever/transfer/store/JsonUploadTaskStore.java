@@ -12,6 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
@@ -55,6 +58,29 @@ public class JsonUploadTaskStore implements UploadTaskStore {
         } catch (IOException exception) {
             throw storageError("Unable to read upload task", exception);
         }
+    }
+
+    @Override
+    public List<UploadTask> findAllByOwner(String ownerUserId) {
+        if (ownerUserId == null || ownerUserId.isBlank() || !Files.isDirectory(metadataRoot)) {
+            return List.of();
+        }
+        List<UploadTask> tasks = new ArrayList<>();
+        try (var paths = Files.list(metadataRoot)) {
+            for (Path path : paths.filter(candidate -> candidate.getFileName().toString().endsWith(".json")).toList()) {
+                try {
+                    UploadTask task = objectMapper.readValue(path.toFile(), UploadTask.class);
+                    if (ownerUserId.equals(task.ownerUserId)) tasks.add(task);
+                } catch (IOException corruptEntry) {
+                    throw storageError("Unable to read upload task " + path.getFileName(), corruptEntry);
+                }
+            }
+        } catch (IOException exception) {
+            throw storageError("Unable to list upload tasks", exception);
+        }
+        tasks.sort(Comparator.comparing((UploadTask task) ->
+                task.updatedAt == null ? java.time.Instant.EPOCH : task.updatedAt).reversed());
+        return tasks;
     }
 
     @Override
