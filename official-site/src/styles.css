@@ -85,5 +85,36 @@
 @keyframes card-deal-in{from{opacity:0;filter:blur(7px);translate:0 42px;scale:.95}to{opacity:1;filter:blur(0);translate:0 0;scale:1}}@keyframes row-slide-in{from{opacity:0;translate:48px 0}to{opacity:1;translate:0 0}}@keyframes visual-unfold{from{opacity:0;clip-path:inset(18% 18% 18% 18% round 28px);scale:.96}to{opacity:1;clip-path:inset(0 0 0 0 round 0);scale:1}}@keyframes copy-arrive{from{opacity:0;translate:34px 0}to{opacity:1;translate:0 0}}
 @media(max-width:900px){.interactive-card:hover,.download-primary.interactive-card:hover{transform:none}.interactive-card::before{display:none}}
 
+/* Self-hosted edition: keep every distro and architecture download directly accessible. */
+.local-section{display:grid;align-items:center;padding:112px 0;background:var(--paper-deep)}
+.local-layout{display:grid;grid-template-columns:minmax(0,.85fr) minmax(510px,1.15fr);align-items:center;gap:clamp(42px,6vw,92px)}
+.local-copy .kicker{margin:20px 0 10px;color:var(--green-dark);font-weight:750}
+.local-copy h2{margin:0 0 24px;font-size:clamp(2.65rem,4.7vw,4.85rem);line-height:1.08;letter-spacing:-.06em}
+.local-copy h2 em{display:block;color:var(--green-dark);font-family:Georgia,"Times New Roman","Songti SC",serif;font-style:normal;font-weight:500;text-wrap:balance}
+.local-lede{max-width:510px;color:var(--muted);font-size:1rem;line-height:1.85}
+.local-points{display:flex;flex-wrap:wrap;gap:8px;margin:25px 0 32px}
+.local-points span{padding:6px 11px;color:var(--green-dark);border:1px solid var(--line-strong);border-radius:99px;background:var(--surface);font-size:.77rem;font-weight:750}
+.local-actions{display:flex;flex-wrap:wrap;gap:11px}
+.local-download-panel{overflow:hidden;border:1px solid var(--line-strong);border-radius:16px;background:var(--surface);box-shadow:var(--shadow-lg)}
+.local-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:27px 29px 23px;border-bottom:1px solid var(--line)}
+.local-panel-head h3{margin:8px 0 0;font-size:1.5rem;letter-spacing:-.035em}
+.local-version{padding:6px 9px;color:var(--green-dark);border:1px solid var(--line);border-radius:6px;background:var(--paper-deep);font-size:.72rem;font-weight:800;white-space:nowrap}
+.local-package-list{padding:5px 29px}
+.local-package-row{display:grid;grid-template-columns:minmax(0,1fr) 108px 108px;align-items:center;gap:10px;min-height:73px;border-bottom:1px solid var(--line)}
+.local-package-row:last-child{border-bottom:0}
+.local-package-name{display:flex;flex-direction:column;line-height:1.35}
+.local-package-name strong{font-size:.9rem}
+.local-package-name small{margin-top:5px;color:var(--muted);font-size:.71rem}
+.local-package-row a{display:inline-flex;min-height:37px;align-items:center;justify-content:center;gap:7px;color:var(--green-deep);border:1px solid var(--line-strong);border-radius:7px;background:var(--paper);font-size:.75rem;font-weight:800;transition:.18s}
+.local-package-row a:hover{color:#fff;border-color:var(--green-dark);background:var(--green-dark);transform:translateY(-2px)}
+.local-package-row a svg,.local-panel-foot a svg{width:14px;height:14px}
+.local-panel-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px;padding:20px 29px;border-top:1px solid var(--line);background:var(--surface-strong)}
+.local-panel-foot a{display:inline-flex;align-items:center;gap:7px;color:var(--green-dark);font-size:.78rem;font-weight:750}
+.local-panel-foot a:hover{text-decoration:underline}
+:root[data-theme='dark'] .local-copy .kicker,:root[data-theme='dark'] .local-copy h2 em,:root[data-theme='dark'] .local-points span,:root[data-theme='dark'] .local-version,:root[data-theme='dark'] .local-package-row a,:root[data-theme='dark'] .local-panel-foot a{color:var(--green-bright)}
+@media(max-width:1100px){.local-layout{grid-template-columns:minmax(0,.8fr) minmax(450px,1.2fr);gap:32px}.local-package-row{grid-template-columns:minmax(0,1fr) 90px 90px}}
+@media(max-width:900px){.local-section{padding:95px 0}.local-layout{grid-template-columns:1fr;gap:42px}.local-copy{max-width:680px}.local-download-panel{max-width:760px}}
+@media(max-width:560px){.local-section{padding:78px 0}.local-copy h2{font-size:clamp(2.35rem,10vw,3.1rem)}.local-actions{display:grid}.local-actions .button{width:100%}.local-panel-head{padding:23px 18px 19px}.local-package-list{padding:5px 18px}.local-package-row{grid-template-columns:minmax(0,1fr) 76px 76px;gap:6px;min-height:73px}.local-package-name strong{font-size:.77rem}.local-package-name small{font-size:.65rem}.local-package-row a{min-height:35px;gap:3px;font-size:.66rem}.local-package-row a svg{width:11px;height:11px}.local-panel-foot{padding:17px 18px}.local-panel-foot a{font-size:.73rem}}
+
 /* Keep the OAuth provider mark faithful to Google's four-colour G. */
 .provider-google .google-mark{width:22px;height:22px}

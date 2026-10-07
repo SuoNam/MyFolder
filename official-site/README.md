@@ -2,6 +2,8 @@
 
 MyFolder 官方网站，基于 Vue 3 与 Vite 构建，展示 v1.1.1 的多设备文件流转、LAN / P2P / Server Relay 智能路由、可靠传输与 OAuth 账号认证能力。
 
+`#local` 章节提供 [MyFolder Local](https://github.com/SuoNam/MyFolder-Local) 独立部署版的 Ubuntu 22.04/24.04、Debian 12/13 的 amd64/arm64 原生 deb 直链，以及源码编译包和安装说明入口。
+
 ## 技术栈
 
 - Vue 3

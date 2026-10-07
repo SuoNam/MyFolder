@@ -13,6 +13,16 @@
 | Web 控制台 | <https://web.myfolder.com.cn> | 文件、设备、群组、传输与账号管理 |
 | API 服务 | <https://api.myfolder.com.cn> | MyFolder Server 公网 API |
 
+## 本地部署版本：MyFolder Local
+
+面向个人与实验室私有服务器的独立版本，提供 C++/Drogon 后端、Vue 3 Web 文件区和 SQLite 存储。管理员可按路径为普通用户分配上传、下载、修改和删除权限。
+
+- [MyFolder Local 独立仓库与功能演示](https://github.com/SuoNam/MyFolder-Local)
+- [Ubuntu / Debian 安装包（amd64、arm64）](https://github.com/SuoNam/MyFolder-Local/releases/tag/v1.5.0-1)
+- [官网本地版下载入口](https://myfolder.com.cn/#local)
+
+本地版独立发布，当前安装包版本为 `v1.5.0-1`；各系统和架构的选择及安装方法见独立仓库 README。
+
 ## v1.1.1 功能概览
 
 ### 多设备与文件传输

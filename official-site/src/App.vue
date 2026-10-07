@@ -19,6 +19,7 @@
         <a href="#how-it-works">传输方式</a>
         <a href="#security">安全认证</a>
         <a href="#download">下载</a>
+        <a href="#local">本地版</a>
       </nav>
 
       <div class="header-actions">
@@ -41,6 +42,7 @@
         <a href="#how-it-works" @click="closeMenu">传输方式</a>
         <a href="#security" @click="closeMenu">安全认证</a>
         <a href="#download" @click="closeMenu">下载</a>
+        <a href="#local" @click="closeMenu">本地版</a>
         <a href="https://web.myfolder.com.cn" @click="closeMenu">打开 Web 控制台</a>
         <a href="https://github.com/SuoNam/MyFolder" target="_blank" rel="noreferrer">GitHub</a>
       </div>
@@ -283,6 +285,37 @@
         </div>
       </section>
 
+      <section id="local" class="local-section snap-page" :class="{ 'is-current-page': activePageIndex === 5 }">
+        <div class="section-wrap local-layout">
+          <div class="local-copy reveal">
+            <span class="section-index">05 / SELF HOSTED</span>
+            <p class="kicker">MyFolder Local · 独立部署版本</p>
+            <h2>把文件区，<em>放在自己的服务器上。</em></h2>
+            <p class="local-lede">适合个人和实验室的私有服务器。C++ / Drogon 后端搭配 Vue 3 Web 界面，以 SQLite 保存配置和权限；管理员可按路径开放文件操作。</p>
+            <div class="local-points"><span>浏览器访问</span><span>路径授权</span><span>Ubuntu / Debian</span></div>
+            <div class="local-actions">
+              <a class="button" href="https://github.com/SuoNam/MyFolder-Local" target="_blank" rel="noreferrer">查看独立仓库 <AppIcon name="arrow" /></a>
+              <a class="button button-ghost" href="https://github.com/SuoNam/MyFolder-Local#readme" target="_blank" rel="noreferrer">安装说明与演示 <AppIcon name="arrow" /></a>
+            </div>
+          </div>
+
+          <div class="local-download-panel reveal reveal-delay-1">
+            <div class="local-panel-head"><div><span class="section-index">NATIVE DEB PACKAGES</span><h3>选择系统与架构</h3></div><span class="local-version">v1.5.0-1</span></div>
+            <div class="local-package-list">
+              <div v-for="platform in localPlatforms" :key="platform.suite" class="local-package-row">
+                <div class="local-package-name"><strong>{{ platform.name }}</strong><small>原生安装包</small></div>
+                <a :href="localDebUrl(platform.suite, 'amd64')" :aria-label="`下载 ${platform.name} amd64 本地版 deb`" target="_blank" rel="noreferrer">amd64 <AppIcon name="download" /></a>
+                <a :href="localDebUrl(platform.suite, 'arm64')" :aria-label="`下载 ${platform.name} arm64 本地版 deb`" target="_blank" rel="noreferrer">arm64 <AppIcon name="download" /></a>
+              </div>
+            </div>
+            <div class="local-panel-foot">
+              <a :href="`${localRelease}/myfolder-lan_1.5.0-1_all.deb`" target="_blank" rel="noreferrer">源码编译包 all.deb <AppIcon name="download" /></a>
+              <a href="https://github.com/SuoNam/MyFolder-Local/releases/tag/v1.5.0-1" target="_blank" rel="noreferrer">查看全部发布文件 <AppIcon name="arrow" /></a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="open-source" class="open-source-section section-wrap reveal snap-page">
         <div>
           <span class="section-index">BUILD IN THE OPEN</span>
@@ -292,6 +325,7 @@
           <a href="https://github.com/SuoNam/MyFolder/tree/main" target="_blank" rel="noreferrer"><span>Server + Build</span><AppIcon name="arrow" /></a>
           <a href="https://github.com/SuoNam/MyFolder/tree/web" target="_blank" rel="noreferrer"><span>Web Source</span><AppIcon name="arrow" /></a>
           <a href="https://github.com/SuoNam/MyFolder/tree/client" target="_blank" rel="noreferrer"><span>Desktop Client</span><AppIcon name="arrow" /></a>
+          <a href="https://github.com/SuoNam/MyFolder-Local" target="_blank" rel="noreferrer"><span>MyFolder Local</span><AppIcon name="arrow" /></a>
         </div>
       </section>
     </main>
@@ -306,7 +340,7 @@
           <p>让文件在你的设备之间自然流动。</p>
         </div>
         <div class="footer-links">
-          <div><strong>产品</strong><a href="#features">产品能力</a><a href="#download">下载</a><a href="https://web.myfolder.com.cn">Web 控制台</a></div>
+          <div><strong>产品</strong><a href="#features">产品能力</a><a href="#download">下载</a><a href="#local">本地版</a><a href="https://web.myfolder.com.cn">Web 控制台</a></div>
           <div><strong>开发</strong><a href="https://github.com/SuoNam/MyFolder">GitHub</a><a href="https://api.myfolder.com.cn/swagger-ui.html">API 文档</a><a href="https://github.com/SuoNam/MyFolder/issues">问题反馈</a></div>
         </div>
       </div>
@@ -331,6 +365,14 @@ const activeRouteIndex = ref(0)
 const activePageIndex = ref(0)
 const transferProgress = ref(18)
 const currentYear = new Date().getFullYear()
+const localRelease = 'https://github.com/SuoNam/MyFolder-Local/releases/download/v1.5.0-1'
+const localPlatforms = [
+  { name: 'Ubuntu 22.04', suite: 'ubuntu22.04' },
+  { name: 'Ubuntu 24.04', suite: 'ubuntu24.04' },
+  { name: 'Debian 12', suite: 'debian12' },
+  { name: 'Debian 13', suite: 'debian13' },
+]
+const localDebUrl = (suite, arch) => `${localRelease}/myfolder-lan_1.5.0-1_${suite}_${arch}.deb`
 
 const pageSections = [
   { id: 'top', label: '首页' },
@@ -338,6 +380,7 @@ const pageSections = [
   { id: 'how-it-works', label: '路由' },
   { id: 'security', label: '安全' },
   { id: 'download', label: '下载' },
+  { id: 'local', label: '本地版' },
   { id: 'open-source', label: '开源' },
 ]
 
