@@ -2,7 +2,7 @@
 
 **MyFolder 是面向个人多设备环境的文件管理与设备间文件流转平台。** 通过桌面客户端、Web 控制台和中心服务，用户可以管理自己的设备与文件，并在 LAN、P2P 和服务器中转通道之间自动选择合适的传输路径。
 
-> 当前公开版本：**v1.1.1**  
+> 当前 Server / Web 部署基线：**v1.1.2**；桌面安装包与自动更新通道独立发布。
 > 官方网站：<https://myfolder.com.cn>
 
 ## 在线服务
@@ -24,6 +24,8 @@
 本地版独立发布，当前安装包版本为 `v1.5.0-1`；各系统和架构的选择及安装方法见独立仓库 README。
 
 ## v1.1.1 功能概览
+
+Server / Web v1.1.2 增加桌面更新清单 API、更新状态展示及移动端布局。详见 [v1.1.2 Web 更新说明](docs/WEB_v1.1.2_MOBILE.md)。此更新不表示桌面 v1.1.2 安装包已经发布。
 
 ### 多设备与文件传输
 
@@ -72,7 +74,7 @@ v1.1.1 对账号体系进行了完整升级，包含：
 
 | 分支 | 内容 |
 |---|---|
-| [`main`](https://github.com/SuoNam/MyFolder/tree/main) | MyFolder Server 源码、官网源码和 Web v1.1.1 部署产物 |
+| [`main`](https://github.com/SuoNam/MyFolder/tree/main) | MyFolder Server v1.1.2 源码、官网源码和 Web v1.1.2 部署产物 |
 | [`web`](https://github.com/SuoNam/MyFolder/tree/web) | Vue 3 Web 控制台源码 |
 | [`client`](https://github.com/SuoNam/MyFolder/tree/client) | Qt 6 / QML 桌面客户端源码与 Windows 打包配置 |
 | [`dev`](https://github.com/SuoNam/MyFolder/tree/dev) | 历史开发内容；不保证与当前发布版同步 |
