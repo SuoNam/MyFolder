@@ -2,7 +2,7 @@
 
 MyFolder Web 是 MyFolder 的浏览器端控制台，使用 Vue 3、TypeScript、Vite、Pinia 和 Vue Router 构建。
 
-> 当前版本：**v1.1.1**  
+> 当前 Web 版本：**v1.1.2（移动端适配更新）**
 > 官网：<https://myfolder.com.cn>  
 > Web 控制台：<https://web.myfolder.com.cn>  
 > API：<https://api.myfolder.com.cn>
@@ -18,10 +18,12 @@ MyFolder Web 是 MyFolder 的浏览器端控制台，使用 Vue 3、TypeScript�
 - 文件浏览、上传、下载和发送
 - 传输任务、历史记录和存储用量查看
 - 账号资料与安全设置
+- 手机导航抽屉、触屏文件操作、群组成员与传输记录窄屏布局
+- 桌面更新清单状态展示（安装包的发布通道独立于 Web 版本）
 
 ## 分支说明
 
-- [`main`](https://github.com/SuoNam/MyFolder/tree/main)：服务端源码、部署文档和 Web v1.1.1 生产构建产物
+- [`main`](https://github.com/SuoNam/MyFolder/tree/main)：服务端源码、部署文档和 Web v1.1.2 生产构建产物
 - [`web`](https://github.com/SuoNam/MyFolder/tree/web)：Web 前端源码
 - [`client`](https://github.com/SuoNam/MyFolder/tree/client)：Qt Windows 客户端源码
 
@@ -57,6 +59,8 @@ VITE_API_BASE=https://api.example.com
 ```
 
 ## 类型检查与构建
+
+移动端回归：安装可选的 Python Playwright/Chromium，执行 `npm run build`，以 `npm run preview -- --host 127.0.0.1 --port 4179` 启动预览，再运行 `python tests/check_responsive.py --chrome <Chromium路径>`。覆盖 320–1280px 六种尺寸及核心页面；所有 API 使用 fixture，不访问真实账号数据。截图写入已忽略的 `.test-artifacts/`。线上部署与验证范围见 [main 分支记录](https://github.com/SuoNam/MyFolder/blob/main/docs/WEB_v1.1.2_MOBILE.md)。
 
 ```bash
 npm run typecheck

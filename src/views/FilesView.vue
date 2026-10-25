@@ -271,7 +271,7 @@ watch(() => route.fullPath, openRoute)
         </div>
       </div>
 
-      <table v-else class="files">
+      <table v-else class="files file-browser">
         <thead>
           <tr>
             <th style="width: 36px"></th>
@@ -323,7 +323,7 @@ watch(() => route.fullPath, openRoute)
                 :aria-label="`重命名 ${f.name}`"
                 @click="startRename(f)"
               >
-                <Icon name="hash" />
+                <Icon name="hash" /><span class="mobile-action-label">重命名</span>
               </button>
               <!-- Directories download as a ZIP, so every row gets this. -->
               <button
@@ -332,7 +332,7 @@ watch(() => route.fullPath, openRoute)
                 :aria-label="f.type === 'Directory' ? `打包下载 ${f.name}` : `下载 ${f.name}`"
                 @click="files.download(f)"
               >
-                <Icon name="download" />
+                <Icon name="download" /><span class="mobile-action-label">下载</span>
               </button>
               <button
                 v-if="f.type === 'Directory'"
@@ -340,7 +340,7 @@ watch(() => route.fullPath, openRoute)
                 :aria-label="`打开 ${f.name}`"
                 @click="goto(f.path)"
               >
-                <Icon name="chevron" />
+                <Icon name="chevron" /><span class="mobile-action-label">打开</span>
               </button>
             </td>
           </tr>

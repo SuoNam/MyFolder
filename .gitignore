@@ -1,5 +1,7 @@
 ﻿node_modules/
 dist/
+.test-artifacts/
+__pycache__/
 *.tar.gz
 .env
 .env.*

@@ -7,10 +7,10 @@ import { useDevicesStore } from '@/stores/devices'
 import { useTransfersStore } from '@/stores/transfers'
 import { useFilesStore } from '@/stores/files'
 import {
-  BASE_URL, getAccountProfile, getOAuthProviders, getStorageUsage, sendEmailCode, startOAuth, updateDisplayName,
+  BASE_URL, getAccountProfile, getDesktopUpdateManifest, getOAuthProviders, getStorageUsage, sendEmailCode, startOAuth, updateDisplayName,
   updateTransferPreferences,
   unlinkOAuth, unregisterDevice, verifySensitive, toApiError,
-  type AccountProfile, type OAuthProviderStatus, type StorageUsage,
+  type AccountProfile, type DesktopUpdateManifest, type OAuthProviderStatus, type StorageUsage,
 } from '@/api'
 import { CLIENT_VERSION, currentIdentity } from '@/lib/device'
 import { formatBytes, formatWhen } from '@/lib/format'
@@ -35,8 +35,13 @@ const displayName = ref('')
 const nameBusy = ref(false)
 const preferenceBusy = ref(false)
 const storageUsage = ref<StorageUsage | null>(null)
+const desktopReleases = ref<DesktopUpdateManifest[]>([])
 const storagePercent = computed(() => storageUsage.value?.limitBytes
   ? Math.min(100, storageUsage.value.usedBytes / storageUsage.value.limitBytes * 100) : 0)
+
+function releaseReady(release: DesktopUpdateManifest) {
+  return !release.withdrawn && release.size > 0 && /^[0-9a-f]{64}$/i.test(release.sha256) && release.downloadUrl.startsWith('https://')
+}
 
 async function saveDisplayName() {
   nameBusy.value = true
@@ -142,10 +147,20 @@ async function unbind(provider: string) {
 onMounted(async () => {
   await devices.refresh()
   try {
-    [profile.value, providers.value, storageUsage.value] = await Promise.all([getAccountProfile(), getOAuthProviders(), getStorageUsage()])
+    const [account, oauthProviders, usage] = await Promise.all([
+      getAccountProfile(), getOAuthProviders(), getStorageUsage(),
+    ])
+    profile.value = account
+    providers.value = oauthProviders
+    storageUsage.value = usage
     displayName.value = profile.value.displayName
   }
   catch (e) { notice.value = toApiError(e).message }
+  try {
+    desktopReleases.value = await Promise.all([
+      getDesktopUpdateManifest('windows'), getDesktopUpdateManifest('linux'),
+    ])
+  } catch { desktopReleases.value = [] }
 })
 </script>
 
@@ -164,7 +179,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.45fr); gap: 14px">
+    <div class="settings-grid">
       <div style="display: grid; gap: 14px">
         <section class="card">
           <div class="card-head"><h3 class="h3">此浏览器的设备身份</h3></div>
@@ -341,6 +356,21 @@ onMounted(async () => {
         </section>
 
         <section class="card">
+          <div class="card-head"><h3 class="h3">桌面客户端</h3><div class="spacer" /><span class="tag">自动更新</span></div>
+          <div class="card-pad desktop-releases">
+            <p class="sub" style="margin-top:0">Windows 与 Linux 客户端会定时检查、断点下载并在 SHA-256 校验通过后安装。</p>
+            <div v-for="release in desktopReleases" :key="release.platform" class="desktop-release-row">
+              <div>
+                <b>{{ release.platform === 'windows' ? 'Windows x64' : 'Linux x64' }}</b>
+                <span class="mono">v{{ release.latestVersion }}</span>
+              </div>
+              <a v-if="releaseReady(release)" class="btn btn-sm" :href="release.downloadUrl" target="_blank" rel="noopener">下载</a>
+              <span v-else class="sub">待发布</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
           <div class="card-head"><h3 class="h3">关于</h3></div>
           <div class="card-pad">
             <p class="mono">MyFolder Web · v{{ CLIENT_VERSION }}</p>
@@ -359,4 +389,5 @@ onMounted(async () => {
 .account-email{font-size:12px;color:var(--muted);margin:10px 0 12px}.oauth-bindings{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:5px 0;margin-bottom:12px}.oauth-binding-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0}.oauth-binding-row div{display:grid;gap:2px}.oauth-binding-row b{font-size:12px}.oauth-binding-row span{font-size:10px;color:var(--muted)}.bind-confirm{border:1px solid var(--line);background:var(--surface-2);padding:10px;margin-bottom:12px}.bind-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:8px}.binding-error{color:var(--alert);margin:-3px 0 10px}
 .account-name-label{display:block;margin-top:14px}.account-name-editor{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center;margin-top:6px}.account-id{font-size:11px;color:var(--faint);margin:8px 0 12px}
 .preference-row{display:flex;align-items:center;justify-content:space-between;gap:18px}.preference-row b{font-size:12px}.preference-row p{margin:4px 0 0}.switch{position:relative;display:inline-flex;width:40px;height:22px;flex:0 0 auto}.switch input{position:absolute;opacity:0;pointer-events:none}.switch span{width:40px;height:22px;border:1px solid var(--line);border-radius:11px;background:var(--sunken);transition:background .15s,border-color .15s}.switch span::after{content:"";display:block;width:16px;height:16px;margin:2px;border-radius:50%;background:var(--surface);border:1px solid var(--line);transition:transform .15s}.switch input:checked+span{background:var(--signal);border-color:var(--signal)}.switch input:checked+span::after{transform:translateX(18px);border-color:transparent}.switch input:focus-visible+span{outline:2px solid var(--focus);outline-offset:2px}.switch input:disabled+span{opacity:.55}
+.desktop-releases{display:grid;gap:9px}.desktop-release-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:9px}.desktop-release-row>div{display:grid;gap:3px}.desktop-release-row b{font-size:12px}.desktop-release-row .mono{font-size:11px;color:var(--muted)}
 </style>

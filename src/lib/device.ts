@@ -26,7 +26,7 @@ const K_TOKEN = 'mf-device-token'
 const K_ACCOUNT = 'mf-device-account'
 const K_LEASE = 'mf-heartbeat-lease'
 
-export const CLIENT_VERSION = '1.1.1'
+export const CLIENT_VERSION = '1.1.2'
 
 const HEARTBEAT_MS = 30_000
 const LEASE_MS = 45_000 // > HEARTBEAT_MS so a live holder never looks stale

@@ -39,7 +39,7 @@ async function leave() {
     <div class="page-head"><div><h1 class="h1">共享群组</h1><p class="sub">通过邮箱邀请用户共同维护文件空间，可分别授予只读或读写权限。</p></div></div>
     <p v-if="store.error" class="sub" style="color: var(--alert); margin-bottom: 14px">{{ store.error }}</p>
     <div v-if="creating" class="card card-pad" style="margin-bottom: 14px">
-      <label class="label">群组名称</label><div style="display:flex; gap:8px"><div class="field" style="flex:1"><input v-model="name" autofocus placeholder="例如：产品资料" @keyup.enter="create" /></div><button class="btn btn-primary" @click="create">创建</button><button class="btn" @click="creating=false">取消</button></div>
+      <label class="label">群组名称</label><div class="group-create-form"><div class="field" style="flex:1"><input v-model="name" autofocus placeholder="例如：产品资料" @keyup.enter="create" /></div><button class="btn btn-primary" @click="create">创建</button><button class="btn" @click="creating=false">取消</button></div>
     </div>
     <div v-if="store.loading" class="card card-pad"><p class="sub">正在读取群组…</p></div>
     <div v-else-if="!store.groups.length" class="card card-pad"><div class="empty"><div class="empty-mark"><Icon name="folder" /></div><div class="empty-title">还没有共享群组</div><p class="empty-sub sub">创建群组后即可邀请其他 MyFolder 用户共同读写文件。</p></div></div>
@@ -57,7 +57,7 @@ async function leave() {
               <button v-if="group.myPermission === 'OWNER' && member.permission !== 'OWNER'" class="btn btn-sm btn-danger" @click="store.removeMember(group.groupId, member.account)">移除</button>
             </div>
           </div>
-          <div v-if="group.myPermission === 'OWNER'" style="display:flex; gap:8px; margin-top:12px"><div class="field" style="flex:1"><input v-model="memberEmail[group.groupId]" type="email" placeholder="输入目标用户邮箱" @keyup.enter="addMember(group)" /></div><select v-model="memberPermission[group.groupId]" class="select-control"><option value="WRITE">可读写</option><option value="READ">只读</option></select><button class="btn" @click="addMember(group)"><Icon name="plus" />添加成员</button></div>
+          <div v-if="group.myPermission === 'OWNER'" class="group-member-form"><div class="field" style="flex:1"><input v-model="memberEmail[group.groupId]" type="email" placeholder="输入目标用户邮箱" @keyup.enter="addMember(group)" /></div><select :value="memberPermission[group.groupId] || 'WRITE'" @change="memberPermission[group.groupId] = ($event.target as HTMLSelectElement).value as 'READ' | 'WRITE'" class="select-control"><option value="WRITE">可读写</option><option value="READ">只读</option></select><button class="btn" @click="addMember(group)"><Icon name="plus" />添加成员</button></div>
         </div>
       </section>
     </div>

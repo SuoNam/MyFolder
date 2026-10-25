@@ -3,6 +3,7 @@ import { useUserStore } from '@/stores/user'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  scrollBehavior: () => ({ top: 0 }),
   routes: [
     { path: '/', redirect: '/devices' },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },

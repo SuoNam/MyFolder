@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance } from 'axios'
 
 // ---------------------------------------------------------------------------
-// Server contract for MyFolder v1.1.1.
+// Server contract for MyFolder v1.1.2.
 //
 // Every endpoint and field name below was verified against the live server at
 // https://api.myfolder.com.cn, not inferred. Two conventions matter:
@@ -128,6 +128,32 @@ export interface ServerDevice {
   createdAt: string
   lastSeenAt: string
   online: boolean
+}
+
+export interface DesktopUpdateManifest {
+  protocolVersion: number
+  platform: 'windows' | 'linux'
+  architecture: string
+  channel: 'stable' | 'beta'
+  currentVersion: string
+  latestVersion: string
+  minimumSupportedVersion: string
+  updateAvailable: boolean
+  mandatory: boolean
+  withdrawn: boolean
+  rolloutPercentage: number
+  rolloutEligible: boolean
+  publishedAt: string
+  releaseNotes: string
+  downloadUrl: string
+  fileName: string
+  size: number
+  sha256: string
+  signatureUrl: string
+  signatureAlgorithm: string
+  publicKeyVersion: string
+  deltaFromVersion: string
+  deltaUrl: string
 }
 
 export interface FileEntry {
@@ -548,6 +574,18 @@ export async function heartbeat(id: string, clientVersion: string): Promise<void
 
 export async function unregisterDevice(id: string): Promise<void> {
   await http.delete(`/api/v1/devices/${encodeURIComponent(id)}`)
+}
+
+/** Public desktop release metadata. Desktop clients use the same contract for automatic updates. */
+export async function getDesktopUpdateManifest(
+  platform: 'windows' | 'linux',
+  channel: 'stable' | 'beta' = 'stable',
+  currentVersion = '0.0.0',
+): Promise<DesktopUpdateManifest> {
+  const { data } = await http.get<DesktopUpdateManifest>('/api/v1/updates/desktop', {
+    params: { platform, arch: 'x64', channel, currentVersion, protocolVersion: 1 },
+  })
+  return data
 }
 
 // ---------------------------------------------------------------------------

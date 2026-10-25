@@ -94,7 +94,7 @@ onUnmounted(() => window.clearInterval(timer))
         <div class="brand auth-brand">
           <img class="brand-mark" src="/myfolder-icon-v2.png" alt="" />
           <div class="brand-name">MyFolder</div>
-          <div class="brand-ver">1.1.1</div>
+          <div class="brand-ver">1.1.2</div>
         </div>
 
         <p class="eyebrow">Secure workspace</p>

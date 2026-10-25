@@ -129,7 +129,7 @@ onUnmounted(() => devices.stopPolling())
         </div>
       </div>
 
-      <table v-else class="files">
+      <table v-else class="files history-table">
         <thead>
           <tr>
             <th>文件</th>
@@ -142,21 +142,21 @@ onUnmounted(() => devices.stopPolling())
         </thead>
         <tbody>
           <tr v-for="r in rows" :key="r.key">
-            <td>
+            <td data-label="文件">
               <div class="file-cell">
                 <div class="file-ico"><Icon name="file" /></div>
                 <span class="file-name">{{ r.name }}</span>
               </div>
             </td>
-            <td class="mono">{{ r.flow }}</td>
-            <td>
+            <td data-label="流向" class="mono">{{ r.flow }}</td>
+            <td data-label="类型">
               <span class="chip" :class="r.kind === '发送' ? 'chip-relay' : 'chip-idle'">
                 {{ r.kind }}
               </span>
             </td>
-            <td class="col-size">{{ formatBytes(r.bytes) }}</td>
-            <td class="col-time">{{ formatWhen(r.when) }}</td>
-            <td>
+            <td data-label="大小" class="col-size">{{ formatBytes(r.bytes) }}</td>
+            <td data-label="时间" class="col-time">{{ formatWhen(r.when) }}</td>
+            <td data-label="结果">
               <span class="chip" :class="resultChip(r.result)">{{ r.result }}</span>
             </td>
           </tr>
