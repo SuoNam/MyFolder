@@ -27,3 +27,9 @@
 - my_server 现有兼容文件名 `MyFolder_Server-v1.1.1.jar` 的内部版本实际为 1.1.2；逐项汇总比较 Java class、迁移 SQL、properties 的 SHA-256，与本次本地构建全部一致，不重复重启或执行迁移。
 - 不修改账号、数据库、文件存储、生产环境变量和官网；回滚可从备份恢复 index 与对应资源。
 - `main` 保留服务端源码和 Web 构建产物，`web` 保留对应前端源码及 `tests/check_responsive.py`。
+
+## 发布后核对
+
+- 线上构建的 20 个文件逐一通过 SHA-256 比对；线上页面也通过上述 6 种尺寸的 fixture 回归。
+- Web → API 的 OPTIONS 请求返回 200，`Access-Control-Allow-Origin` 为正确的 Web 域名；OAuth provider 和更新清单公开接口返回 200。
+- 另在干净检出中执行 `npm ci && npm run build` 成功。`npm audit` 报告现有依赖树存在 7 个 high 级条目（含构建工具和传递依赖）；此次未做依赖大范围升级，也未将报告直接等同为生产站点存在可利用漏洞，需单独评估和升级回归。
